@@ -1,6 +1,9 @@
 # Makefile August 2006 by Alexandros Stamatakis
 # Makefile cleanup October 2006, Courtesy of Peter Cordes <peter@cordes.ca>
 
+
+GITVERSION:=$(shell cat version.h   | cut -f 3 -d ' ' | tr -d '"')
+
 CC = mpicc
 
 CFLAGS = -D__SIM_SSE3  -msse3 -D_GNU_SOURCE -O2 -fomit-frame-pointer -funroll-loops -D_OPTIMIZED_FUNCTIONS -D_USE_ALLREDUCE #-Wall -pedantic -Wunused-parameter -Wredundant-decls  -Wreturn-type  -Wswitch-default -Wunused-value -Wimplicit  -Wimplicit-function-declaration  -Wimplicit-int -Wimport  -Wunused  -Wunused-function  -Wunused-label -Wno-int-to-pointer-cast -Wbad-function-cast  -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs  -Wold-style-definition -Wstrict-prototypes  -Wdeclaration-after-statement -Wpointer-sign -Wextra -Wredundant-decls -Wunused -Wunused-function -Wunused-parameter -Wunused-value  -Wunused-variable -Wformat  -Wformat-nonliteral -Wparentheses -Wsequence-point -Wuninitialized -Wundef -Wbad-function-cast
@@ -12,12 +15,13 @@ RM = rm -f
 
 objs    = axml.o optimizeModel.o trash.o searchAlgo.o topologies.o  treeIO.o models.o evaluatePartialGenericSpecial.o evaluateGenericSpecial.o newviewGenericSpecial.o makenewzGenericSpecial.o bipartitionList.o restartHashTable.o 
 
-all : examl
+TARGET:=examl-$(GITVERSION)
+all : $(TARGET) vupdate 
 
 GLOBAL_DEPS = axml.h globalVariables.h
 
-examl : $(objs)
-	$(CC) -o examl $(objs) $(LIBRARIES) 
+$(TARGET) : $(objs)
+	$(CC) -o $@ $(objs) $(LIBRARIES) 
 
 bipartitionList.o : bipartitionList.c $(GLOBAL_DEPS)
 evaluatePartialSpecialGeneric.o : evaluatePartialSpecialGeneric.c $(GLOBAL_DEPS)
@@ -35,4 +39,6 @@ makenewzGenericSpecial.o : makenewzGenericSpecial.c $(GLOBAL_DEPS)
 restartHashTable.o : restartHashTable.c $(GLOBAL_DEPS)
 
 clean : 
-	$(RM) *.o examl
+	$(RM) *.o $(TARGET)
+
+include Makefile.version

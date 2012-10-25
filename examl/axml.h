@@ -29,6 +29,7 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
+#include "version.h"
 #include <assert.h>
 #include <stdint.h>
 
@@ -39,11 +40,7 @@
 #endif
 
 
-
-
 #include <mpi.h>
-
-
 
 
 #define MAX_TIP_EV     0.999999999 /* max tip vector value, sum of EVs needs to be smaller than 1.0, otherwise the numerics break down */
@@ -171,7 +168,7 @@
 #define PointGamma(prob,alpha,beta)  PointChi2(prob,2.0*(alpha))/(2.0*(beta))
 
 #define programName        "ExaML"
-#define programVersion     "1.0.0"
+#define programVersion     VERSION
 #define programDate        "September 2012"
 
 
