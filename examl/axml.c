@@ -42,7 +42,6 @@
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdarg.h>
@@ -63,7 +62,21 @@
 #endif
 
 #include "axml.h"
+
+#define  INCLUDE_DEFINITION
 #include "globalVariables.h"
+#undef INCLUDE_DEFINITION
+
+
+/* 
+   :TODO: stuff I omitted for simplicity 
+
+   * Thread to core pinning 
+
+
+
+*/
+
 
 
 
@@ -948,6 +961,10 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     modelSet = 0, 
     byteFileSet = 0;
 
+#ifdef _USE_PTHREADS
+  NumberOfThreads = 0;
+#endif
+
 
   /*********** tr inits **************/ 
  
@@ -977,7 +994,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 
 
 
-  while(!bad_opt && ((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:w:n:s:vhMSDQa", &optind, &optarg))!=-1))
+  while(!bad_opt && ((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:T:w:n:s:vhMSDQa", &optind, &optarg))!=-1))
     {
     switch(c)
       {    
@@ -1064,6 +1081,17 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
         strcpy(resultDir, optarg);
 	resultDirSet = TRUE;
         break;
+      case 'T':
+#ifdef _USE_PTHREADS
+	sscanf(optarg,"%d", &NumberOfThreads);
+#else
+	if(processID == 0)
+	  {
+	    printf("Option -T does not have any effect with the sequential or parallel MPI version.\n");
+	    printf("It is used to specify the number of threads for the Pthreads-based parallelization\n");
+	  }	
+#endif
+	break; 
       case 't':
 	strcpy(tree_file, optarg);       
 	treeSet = 1;       
@@ -1088,9 +1116,6 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       }
     }
 
-
-
-  
 
   if(!byteFileSet)
     {
@@ -1204,7 +1229,9 @@ static void makeFileNames(void)
 	  printf("in directory %s ...... exiting\n", workdir);
 	}
 
+#ifndef _NOT_PRODUCTIVE
       errorExit(-1);	
+#endif
     }
 }
 
@@ -1241,7 +1268,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       
       
      
-      printBoth(infoFile, "\nAlignment has %z distinct alignment patterns\n\n",  tr->originalCrunchedLength);
+      printBoth(infoFile, "\nAlignment has %d distinct alignment patterns\n\n",  tr->originalCrunchedLength);
       
      
       
@@ -2147,7 +2174,7 @@ int main (int argc, char *argv[])
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &processID);
   MPI_Comm_size(MPI_COMM_WORLD, &processes);
-  printf("\nThis is ExaML FINE-GRAIN MPI Process Number: %d\n", processID);   
+  /* printf("\nThis is ExaML FINE-GRAIN MPI Process Number: %d\n", processID);    */
   MPI_Barrier(MPI_COMM_WORLD);
   
   {
@@ -2180,7 +2207,16 @@ int main (int argc, char *argv[])
   /* generate the ExaML output file names and store them in strings */
     
     makeFileNames();
-
+    
+#ifdef _USE_PTHREADS
+    startPthreads(tr);
+    
+    assert(NumberOfThreads != 0); 
+    /* masterBarrier(THREAD_INIT_PARTITION, tr); */
+    /* if(!adef->readTaxaOnly) */
+    /*   masterBarrier(THREAD_ALLOC_LIKELIHOOD, tr); */
+#endif
+    
     initializeTree(tr, adef);                               
     
     if(processID == 0)  

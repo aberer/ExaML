@@ -31,6 +31,12 @@
 
 
 
+
+
+#ifdef INCLUDE_DEFINITION 
+
+
+
 int processes;
 double *globalResult;
 
@@ -174,3 +180,27 @@ partitionLengths pLength;
 
 
 
+
+#ifdef _USE_PTHREADS
+volatile int             NumberOfJobs;
+volatile int             jobCycle = 0;
+volatile int             threadJob = 0;
+volatile int             NumberOfThreads;
+volatile double          *reductionBufferTwo;
+volatile double          *reductionBufferThree;
+volatile int             *reductionBufferParsimony;
+volatile char             *barrierBuffer;
+
+volatile branchInfo      **branchInfos;
+pthread_mutex_t          mutex;
+#endif
+
+
+#else  /* only include declaration    */
+extern int processID;
+extern volatile int             NumberOfThreads;
+extern volatile int             jobCycle;
+extern volatile int             threadJob;
+extern volatile char             *barrierBuffer;
+extern pthread_mutex_t          mutex;
+#endif

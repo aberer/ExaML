@@ -32,6 +32,9 @@
 #include "version.h"
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
+
+
 
 #ifdef __AVX
 #define BYTE_ALIGNMENT 32
@@ -52,6 +55,8 @@
 #define defaultz       0.9         /* value of z assigned as starting point */
 #define unlikely       -1.0E300    /* low likelihood for initialization */
 
+
+#define NOT !  
 
 #define SUMMARIZE_LENGTH -3
 #define SUMMARIZE_LH     -2
@@ -318,6 +323,8 @@
 
 
 typedef  int boolean;
+typedef unsigned int nat; 
+
 
 
 typedef struct {
@@ -774,6 +781,12 @@ typedef  struct  {
   char bits_in_16bits [0x1u << 16];
   
   boolean useMedian;
+
+#ifdef _USE_PTHREADS
+  int threadID; 
+#endif
+
+
 } tree;
 
 
@@ -1182,5 +1195,70 @@ extern void newviewGTRGAMMAPROT_AVX(int tipCase,
 				    double *x1, double *x2, double *x3, double *extEV, double *tipVector,
 				    unsigned char *tipX1, unsigned char *tipX2, int n, 
 				    double *left, double *right, int *wgt, int *scalerIncrement);
+
+#endif
+
+
+
+
+/* thread specific stuff */
+#ifdef _USE_PTHREADS
+
+typedef struct
+{
+  tree *tr;
+  int threadNumber;
+}
+threadData;
+
+
+
+
+/* work tags for parallel regions */
+/* :TODO: reduce   */
+#define THREAD_NEWVIEW                0
+#define THREAD_EVALUATE               1
+#define THREAD_MAKENEWZ               2
+#define THREAD_MAKENEWZ_FIRST         3
+#define THREAD_RATE_CATS              4
+#define THREAD_NEWVIEW_PARSIMONY      5
+#define THREAD_EVALUATE_PARSIMONY     6
+#define THREAD_EVALUATE_VECTOR        7
+#define THREAD_ALLOC_LIKELIHOOD       8
+#define THREAD_COPY_RATE_CATS         9
+#define THREAD_COPY_INVAR             10
+#define THREAD_COPY_INIT_MODEL        11
+#define THREAD_FIX_MODEL_INDICES      12
+#define THREAD_INIT_PARTITION         13
+#define THREAD_OPT_INVAR              14
+#define THREAD_OPT_ALPHA              15
+#define THREAD_OPT_RATE               16
+#define THREAD_RESET_MODEL            17
+#define THREAD_COPY_ALPHA             18
+#define THREAD_COPY_RATES             19
+#define THREAD_CAT_TO_GAMMA           20
+#define THREAD_GAMMA_TO_CAT           21
+#define THREAD_NEWVIEW_MASKED         22
+#define THREAD_COPY_PARAMS            26
+#define THREAD_PARSIMONY_RATCHET            27
+#define THREAD_INIT_EPA                     28
+#define THREAD_GATHER_LIKELIHOOD            29
+#define THREAD_INSERT_CLASSIFY              30
+#define THREAD_INSERT_CLASSIFY_THOROUGH     31
+#define THREAD_GATHER_PARSIMONY             32
+#define THREAD_INSERT_CLASSIFY_THOROUGH_BS  33
+#define THREAD_PARSIMONY_INSERTIONS         34
+#define THREAD_PREPARE_EPA_PARSIMONY        35
+#define THREAD_CLEANUP_EPA_PARSIMONY        36
+#define THREAD_CONTIGUOUS_REPLICATE         37
+#define THREAD_USE_GAPPED                   38
+#define THREAD_PREPARE_BIPS_FOR_PRINT       39
+#define THREAD_MRE_COMPUTE                  40
+#define THREAD_BROADCAST_RATE               41
+#define THREAD_OPTIMIZE_PER_SITE_AA         42
+
+void startPthreads(tree *tr); 
+void masterBarrier(int jobType, tree *tr); 
+
 
 #endif

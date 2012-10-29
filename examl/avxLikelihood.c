@@ -3,7 +3,6 @@
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdint.h>
