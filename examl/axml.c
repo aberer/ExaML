@@ -1802,7 +1802,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
     j,
     width,
     model,
-    offset,
+    /* offset, */
     countOffset,
     myLength = 0;
 
@@ -1915,7 +1915,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
    
   for(i = 0; i < (size_t)tr->mxtips; i++)
     {
-      for(model = 0, offset = 0, countOffset = 0; model < (size_t)tr->NumberOfModels; model++)
+      for(model = 0,countOffset = 0; model < (size_t)tr->NumberOfModels; model++)
 	{
 	  tr->partitionData[model].yVector[i+1]   = &tr->y_ptr[i * myLength + countOffset];
 	  countOffset +=  tr->partitionData[model].width;

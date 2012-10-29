@@ -1052,7 +1052,6 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 void makenewzGeneric(tree *tr, nodeptr p, nodeptr q, double *z0, int maxiter, double *result, boolean mask)
 {
   int i;
-  boolean originalExecute[NUM_BRANCHES];
 
   /* the first entry of the traversal descriptor stores the node pair that defines 
      the branch */
@@ -1062,7 +1061,6 @@ void makenewzGeneric(tree *tr, nodeptr p, nodeptr q, double *z0, int maxiter, do
   
   for(i = 0; i < tr->numBranches; i++)
     {
-      originalExecute[i] =  tr->executeModel[i];
       tr->td[0].ti[0].qz[i] =  z0[i];
       if(mask)
 	{
