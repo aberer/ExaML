@@ -1,0 +1,17 @@
+
+VERSIONFILE:="version.h"
+
+
+GIT_AVAILABLE:=$(shell which git > /dev/null  ; echo $$?)
+ifeq ($(GIT_AVAILABLE),0)
+NEW_VERSION:=$(shell git describe 2> /dev/null)
+else 
+NEW_VERSION:=$(shell cat $(VERSIONFILE) | cut -f 3 -d ' ')
+endif
+
+.phony : vupdate 
+
+vupdate : 
+	@echo "#define VERSION \"$(NEW_VERSION)\"" > $(VERSIONFILE)
+
+
