@@ -68,20 +68,6 @@
 #undef INCLUDE_DEFINITION
 
 
-/* 
-   :TODO: stuff I omitted for simplicity 
-
-   * Thread to core pinning 
-
-
-
-*/
-
-
-
-
-
-
 /***************** UTILITY FUNCTIONS **************************/
 
 void storeExecuteMaskInTraversalDescriptor(tree *tr)
@@ -2174,7 +2160,6 @@ int main (int argc, char *argv[])
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &processID);
   MPI_Comm_size(MPI_COMM_WORLD, &processes);
-  /* printf("\nThis is ExaML FINE-GRAIN MPI Process Number: %d\n", processID);    */
   MPI_Barrier(MPI_COMM_WORLD);
   
   {

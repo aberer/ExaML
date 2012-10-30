@@ -8,6 +8,15 @@
 #include "globalVariables.h"
 
 
+/* 
+   :TODO: stuff I omitted for simplicity 
+
+   * Thread to core pinning 
+
+
+
+*/
+
 
 
 static void execFunction(tree *tr, tree *localTree, int tid, int n)
@@ -18,14 +27,12 @@ static void execFunction(tree *tr, tree *localTree, int tid, int n)
 
   currentJob = threadJob >> 16;
 
-
-
   switch(currentJob)
   {            
   case 0: 
   case 13: 
     {
-      printf("okay at first\n"); 
+      printf("worker %d/%d has nothing to do\n", tid, processID); 
       sleep(1);
       break; 
     }
