@@ -2141,6 +2141,7 @@ static void initializeTree(tree *tr, analdef *adef)
   free(empiricalFrequencies);
 }
 
+void mcmc(tree *tr, analdef *adef);
 
 int main (int argc, char *argv[])
 { 
@@ -2228,9 +2229,11 @@ int main (int argc, char *argv[])
 	treeEvaluate(tr, 1); 
 
 	/* now start the ML search algorithm */
-      
-
+#if 1
+        mcmc( tr, adef );
+#else
 	computeBIGRAPID(tr, adef, TRUE); 			     
+#endif
       }            
       
     /* print some more nonsense into the ExaML_info file */
