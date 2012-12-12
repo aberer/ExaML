@@ -8,6 +8,8 @@
 
 
 #include "axml.h"
+#include "cycle.h"
+
 extern char run_id[128];
 extern int processID;
 extern int Thorough;
@@ -20,6 +22,7 @@ typedef enum
   UPDATE_ALL_BL,
   UPDATE_MODEL,
   UPDATE_GAMMA,
+  UPDATE_SINGLE_BL
 }prop;
 
 typedef struct {
@@ -55,6 +58,13 @@ typedef struct {
   double bl_sliding_window_w;
   double bl_prior;
   double bl_prior_exp_lambda;
+  
+  /*
+   * necessary for the single branch length moves
+   */
+  
+  int single_bl_branch;
+  
   /*
    * necessary for model moves
    */
@@ -93,6 +103,9 @@ static state *state_init(tree *tr, analdef * adef, int maxradius, double bl_w, d
   curstate->curSubsRates = (double *) malloc(curstate->numSubsRates * sizeof(double));
   curstate->gm_sliding_window_w = gm_w;
   assert(curstate != NULL);
+  
+  curstate->single_bl_branch = -1;
+  
   return curstate;
 }
 
@@ -191,8 +204,81 @@ static void traverse_branches(nodeptr p, int *count, state * s, boolean resetBL)
       traverse_branches(q->back, count, s, resetBL);
       q = q->next;
     }   
+    // WTF? in each recursion?
     newviewGeneric(s->tr, p, FALSE);     // not sure if we need this
   }
+}
+
+static node *select_branch_by_id_dfs_rec( node *p, int *cur_count, int target, state *s ) {
+  if( (*cur_count) == target ) {
+    return p;
+  }
+  
+  if( !isTip( p->number, s->tr->mxtips )) {
+   // node *q = p->back;
+    node *ret = NULL;
+    
+    ++(*cur_count);
+    ret = select_branch_by_id_dfs_rec( p->next->back, cur_count, target, s );
+    if( ret != NULL ) {
+      return ret;
+    }
+    
+    ++(*cur_count);
+    ret = select_branch_by_id_dfs_rec( p->next->next->back, cur_count, target, s );
+    
+    return ret;
+  } else {
+    return NULL;
+  }
+}
+
+
+static node *select_branch_by_id_dfs( node *p, int target, state *s ) {
+  const int num_branches = (2 * s->tr->mxtips) - 3;
+  
+//   if( target == num_branches ) {
+//     return NULL;
+//   } 
+  
+  assert( target < num_branches );
+  
+  int cur_count = 0;
+  node *ret = NULL;
+  
+  
+  ret = select_branch_by_id_dfs_rec( p, &cur_count, target, s );
+  
+  if( ret != NULL ) {
+    return ret;
+  } else {
+    // not in subtree below p. search on in the subtrees below p->back
+  
+    node *q = p->back;
+    
+    if( isTip( q->number, s->tr->mxtips ) ) {
+      assert( 0 ); // error: target must be invalid 'branch id'
+      return NULL; 
+    }
+    
+    ++cur_count;
+    ret = select_branch_by_id_dfs_rec( q->next->back, &cur_count, target, s );
+  
+    if( ret != NULL ) {
+      return ret;
+    }
+    
+    
+    ++cur_count;
+    ret = select_branch_by_id_dfs_rec( q->next->next->back, &cur_count, target, s );
+  
+    return ret;
+  
+  }
+  
+  assert(0);
+  
+  
 }
 
 
@@ -263,6 +349,50 @@ static void resetSimpleBranchLengthProposal(state * instate)
 {
   update_all_branches(instate, TRUE);
 }
+
+
+
+/*
+ * should be sliding window proposal
+ */
+
+static boolean randomBranchLengthProposal(state * instate)
+{
+   
+  //for each branch get the current branch length
+  //pull a uniform like
+  //x = current, w =window
+  //uniform(x-w/2,x+w/2)
+  
+  
+  const int num_branches = (instate->tr->mxtips * 2) - 3;
+  int target_branch = rand() % num_branches;
+  node *p = select_branch_by_id_dfs( instate->tr->start, target_branch, instate );
+  
+  
+//   printf( "apply bl: %p %f\n", p, p->z[0] );
+  set_branch_length_sliding_window(p, instate->tr->numBranches, instate, TRUE);
+
+  instate->single_bl_branch = target_branch;
+  evaluateGeneric(instate->tr, instate->tr->start, TRUE); /* update the tr->likelihood */
+  return TRUE;
+}
+
+static void resetRandomBranchLengthProposal(state * instate)
+{
+  node *p;
+  assert( instate->single_bl_branch != -1 );
+  
+  // ok, maybe it would be smarter to store the node ptr for rollback rather than re-search it...
+  p = select_branch_by_id_dfs( instate->tr->start, instate->single_bl_branch, instate );
+  
+  reset_branch_length(p, instate->tr->numBranches);
+//   printf( "reset bl: %p %f\n", p, p->z[0] );
+  //update_all_branches(instate, TRUE);
+  evaluateGeneric(instate->tr, instate->tr->start, TRUE); /* update the tr->likelihood */
+  instate->single_bl_branch = -1;
+}
+
 
 
 /*
@@ -497,11 +627,46 @@ static void resetSPR(state * instate)
 }
 
 
-static prop proposal(state * instate)
+static void dispatchProposalApply( prop proposal_type, state *instate ) {
+  //     assert(which_proposal == SPR || which_proposal == stNNI ||
+//            which_proposal == UPDATE_ALL_BL || which_proposal == UPDATE_SINGLE_BL || 
+//            which_proposal == UPDATE_MODEL || which_proposal == UPDATE_GAMMA );
+  
+  switch( proposal_type ) {
+    case UPDATE_MODEL:
+      simpleModelProposal(instate);
+      break;
+      
+    case UPDATE_ALL_BL:
+      simpleBranchLengthProposal(instate);
+      break;
+      
+    case UPDATE_SINGLE_BL:
+      randomBranchLengthProposal( instate );
+      break;
+    
+      
+    case SPR:
+//       if (randprop < 0.15)
+//         instate->maxradius = 1;
+//       else
+//         instate->maxradius = 2;
+      
+      doSPR(instate->tr, instate);  
+      break;
+      
+      
+    default:
+      assert(0);
+  } 
+  
+}
+
+static prop selectProposalType(state * instate)
 /* so here the idea would be to randomly choose among proposals? we can use typedef enum to label each, and return that */ 
 {
   double randprop = (double)rand()/(double)RAND_MAX;
-  boolean proposalSuccess;
+//   boolean proposalSuccess;
   //double start_LH = evaluateGeneric(instate->tr, instate->tr->start); /* for validation */
   prop proposal_type;
   //simple proposal
@@ -577,32 +742,28 @@ static prop proposal(state * instate)
 #else
 //   printf( "%d %f\n", processID, randprop );
   instate->newprior = instate->bl_prior;
+  
+  
+  // select proposal type based on randprop
   if( randprop < 0.1 ) {
     proposal_type = UPDATE_MODEL;
-    simpleModelProposal(instate);
-  } else if( 1 && randprop < 0.2 ) {
-    proposal_type = UPDATE_ALL_BL;
-    proposalSuccess = simpleBranchLengthProposal(instate);
-    
+  } else if( 1 && randprop < 0.5 ) {
+    proposal_type = UPDATE_SINGLE_BL;
+   // proposal_type = UPDATE_ALL_BL;
+
   } else {
-    
     proposal_type = SPR;
-    
-    if (randprop < 0.15)
-      instate->maxradius = 1;
-    else
-      instate->maxradius = 2;
-    
-    doSPR(instate->tr, instate);
-    
-//      printf( "propose SPR: %d\n", spr_depth );
   }
+  
+  
+  
+
   return proposal_type;
 #endif
   
 }
 
-static void resetState(prop proposal_type, state * curstate)
+static void dispatchProposalReset(prop proposal_type, state * curstate)
 {
   switch(proposal_type)
   {
@@ -620,6 +781,10 @@ static void resetState(prop proposal_type, state * curstate)
       //printf("RESETBL\n");
       break;
 
+    case UPDATE_SINGLE_BL:
+      resetRandomBranchLengthProposal(curstate);
+      break;
+      
     case UPDATE_MODEL:
       resetSimpleModelProposal(curstate);
       break;
@@ -771,7 +936,7 @@ void mcmc(tree *tr, analdef *adef)
   
   int j;
   int maxradius = 30;
-  int num_moves = 100000;
+  int num_moves = 500000;
   
   size_t accepted_nni = 0;
   size_t accepted_spr = 0;
@@ -798,6 +963,9 @@ void mcmc(tree *tr, analdef *adef)
   
   tr->start = find_tip(tr->start, tr );
   
+  
+  
+  
   printf( "isTip: %d %d\n", tr->start->number, tr->mxtips );
   printf( "z: %f\n", tr->start->z[0] );
   
@@ -805,6 +973,7 @@ void mcmc(tree *tr, analdef *adef)
   
   state *curstate = state_init(tr, adef, maxradius, bl_sliding_window_w, rt_sliding_window_w, gm_sliding_window_w, bl_prior_exp_lambda);
   
+#if 0
   evaluateGeneric(tr, tr->start, TRUE);  
   tr->startLH = tr->likelihood;
   printBothOpen("Starting with tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
@@ -826,14 +995,32 @@ void mcmc(tree *tr, analdef *adef)
   //printf( "zx: %f\n", tr->start->z[0] );
   evaluateGeneric(tr, tr->start, TRUE);
   printf( "at start: %f\n", tr->likelihood );
-  
-  if( 0 )
+#endif  
+  if( 1 )
   {
     
     int count = 0;
     traverse_branches_set_fixed( tr->start, &count, curstate, 0.65 );
   }
   
+  
+//   {
+//     int i;
+//     
+//     for( i = 0; ; ++i ) {
+//       node *p = select_branch_by_id_dfs( tr->start, i, curstate );
+//    
+//       printf( "branch: %d %p\n", i, p );
+//       
+//       if( p == NULL ) {
+//         break;
+//       }
+//     }
+//     
+//     
+//   }
+  
+
   evaluateGeneric(tr, tr->start, TRUE);
   printf( "after reset start: %f\n", tr->likelihood );
   int first = 1;
@@ -841,9 +1028,12 @@ void mcmc(tree *tr, analdef *adef)
   curstate->curprior = 1;
   curstate->hastings = 1;
   
+  perf_timer all_timer = perf_timer_make();
+  
   /* beginning of the MCMC chain */
   for(j=0; j<num_moves; j++)
   {
+    perf_timer move_timer = perf_timer_make();
     prop which_proposal;
     double t = gettime(); 
     double proposalTime = 0.0;
@@ -853,23 +1043,36 @@ void mcmc(tree *tr, analdef *adef)
 //     printBothOpen("iter %d, tr LH %f, startLH %f\n",j, tr->likelihood, tr->startLH);
     proposalAccepted = FALSE;
     
+    //
+    // start of the mcmc iteration
+    //
 
-    evaluateGeneric(tr, tr->start, FALSE); // just for validation (make sure we compare the same)
+    
+    // just for validation (make sure we compare the same)
+    evaluateGeneric(tr, tr->start, FALSE); 
+    
+    perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
 //      printBothOpen("before proposal, iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
     tr->startLH = tr->likelihood;
 
-    which_proposal = proposal(curstate);
-//     printf( "z: %f\n", tr->start->z[0] );
+    //which_proposal = proposal(curstate);
+    
+    // select proposal type
+    which_proposal = selectProposalType( curstate );
+    
+    // apply the proposal function
+    dispatchProposalApply(which_proposal, curstate );
+
+    perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
+    // FIXME: why is this here?
     if (first == 1)
     {
       first = 0;
       curstate->curprior = curstate->newprior;
     }
 //     printBothOpen("proposal done, iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
-    assert(which_proposal == SPR || which_proposal == stNNI ||
-           which_proposal == UPDATE_ALL_BL || 
-           which_proposal == UPDATE_MODEL || which_proposal == UPDATE_GAMMA);
-    proposalTime += gettime() - t;
+
+    //proposalTime += gettime() - t;
     /* decide upon acceptance */
     testr = (double)rand()/(double)RAND_MAX;
     //should look something like 
@@ -886,11 +1089,13 @@ void mcmc(tree *tr, analdef *adef)
       printBothOpen("after proposal, iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
     */
     
-    
+    perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
     if(processID == 0 && (j % 100) == 0) {
-      printf( "propb: %d %f %f %d %d %d %d %f %f %f\n", j, tr->likelihood, tr->startLH, testr < acceptance, accepted_spr, accepted_model, accepted_bl, curstate->hastings, curstate->newprior, curstate->curprior );
+      printf( "propb: %d %f %f %d spr: %lu (%lu) model: %lu (%lu) bl: %lu (%lu) %f %f %f\n", j, tr->likelihood, tr->startLH, testr < acceptance, accepted_spr, rejected_spr, accepted_model, rejected_model, accepted_bl, rejected_bl, curstate->hastings, curstate->newprior, curstate->curprior );
       
       printSubsRates(curstate->tr, curstate->model, curstate->numSubsRates);
+      
+      perf_timer_print( &all_timer );
     }
     
     if(testr < acceptance)
@@ -917,6 +1122,7 @@ void mcmc(tree *tr, analdef *adef)
           accepted_nni++;
           break;
 
+        case UPDATE_SINGLE_BL:    
         case UPDATE_ALL_BL:       
           //      printBothOpen("BL new , iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
           accepted_bl++;
@@ -941,7 +1147,7 @@ void mcmc(tree *tr, analdef *adef)
     {
       //printBothOpen("rejected , iter %d tr LH %f, startLH %f, %i \n", j, tr->likelihood, tr->startLH, which_proposal);
     //print_proposal(which_proposal);
-      resetState(which_proposal,curstate);
+      dispatchProposalReset(which_proposal,curstate);
       
       switch(which_proposal)
         {
@@ -951,6 +1157,7 @@ void mcmc(tree *tr, analdef *adef)
         case stNNI:
           rejected_nni++;
           break;
+        case UPDATE_SINGLE_BL:
         case UPDATE_ALL_BL:
           rejected_bl++;
           break;
@@ -981,6 +1188,12 @@ void mcmc(tree *tr, analdef *adef)
       assert(fabs(curstate->tr->startLH - tr->likelihood) < 0.1);
     }       
     inserts++;
+    perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
+    
+    perf_timer_add( &all_timer, &move_timer );
+    
+    
+    
     
 #if 0
     /* need to print status */

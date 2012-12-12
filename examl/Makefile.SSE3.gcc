@@ -16,7 +16,7 @@ objs    = axml.o optimizeModel.o trash.o searchAlgo.o topologies.o  treeIO.o mod
 
 all : examl
 
-GLOBAL_DEPS = axml.h globalVariables.h
+GLOBAL_DEPS = axml.h globalVariables.h cycle.h
 
 examl : $(objs)
 	$(CC) -o examl $(objs) $(LIBRARIES) 
