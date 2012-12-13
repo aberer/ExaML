@@ -23,7 +23,7 @@ typedef enum
   UPDATE_MODEL,
   UPDATE_GAMMA,
   UPDATE_SINGLE_BL
-}prop;
+} proposal_type;
 
 typedef struct {
   
@@ -324,7 +324,7 @@ static void traverse_branches_set_fixed(nodeptr p, int *count, state * s, double
  * should be sliding window proposal
  */
 
-static boolean simpleBranchLengthProposal(state * instate)
+static boolean simpleBranchLengthProposalApply(state * instate)
 {
    
   //for each branch get the current branch length
@@ -345,7 +345,7 @@ static boolean simpleBranchLengthProposal(state * instate)
   return TRUE;
 }
 
-static void resetSimpleBranchLengthProposal(state * instate)
+static void simpleBranchLengthProposalReset(state * instate)
 {
   update_all_branches(instate, TRUE);
 }
@@ -356,7 +356,7 @@ static void resetSimpleBranchLengthProposal(state * instate)
  * should be sliding window proposal
  */
 
-static boolean randomBranchLengthProposal(state * instate)
+static boolean randomBranchLengthProposalApply(state * instate)
 {
    
   //for each branch get the current branch length
@@ -378,7 +378,7 @@ static boolean randomBranchLengthProposal(state * instate)
   return TRUE;
 }
 
-static void resetRandomBranchLengthProposal(state * instate)
+static void randomBranchLengthProposalReset(state * instate)
 {
   node *p;
   assert( instate->single_bl_branch != -1 );
@@ -409,7 +409,7 @@ static void editSubsRates(tree *tr, int model, int subRatePos, double subRateVal
   tr->partitionData[model].substRates[subRatePos] = subRateValue;
 }
 
-static void simpleModelProposal(state * instate)
+static void simpleModelProposalApply(state * instate)
 {
   //TODO: add safety to max and min values
   //record the old ones
@@ -469,7 +469,7 @@ static void restoreSubsRates(tree *tr, analdef *adef, int model, int numSubsRate
   evaluateGeneric(tr, tr->start, TRUE);
 }
 
-static void resetSimpleModelProposal(state * instate)
+static void simpleModelProposalReset(state * instate)
 {
   restoreSubsRates(instate->tr, instate->adef, instate->model, instate->numSubsRates, instate->curSubsRates);
   //evaluateGeneric(instate->tr, instate->tr->start, FALSE);
@@ -520,9 +520,9 @@ static node *randomSPR_traverse( tree *tr, node *n ) {
 
   double randprop = (double)rand()/(double)RAND_MAX;
   
-  if( isTip(n->number, tr->mxtips ) || randprop < 0.1 ) {
+  if( isTip(n->number, tr->mxtips ) || randprop < 0.5 ) {
     return n;
-  } else if( randprop >= 0.1 && randprop < 0.55 ) {
+  } else if( randprop < 0.75 ) {
     spr_depth++;
     return randomSPR_traverse( tr, n->next->back );
   } else {
@@ -543,8 +543,10 @@ static node *randomSPR( tree *tr, node *n ) {
   }
 }
 
-static void doSPR(tree *tr, state *instate)
+static void randomSPRApply(state *instate)
 {
+  tree * tr = instate->tr;
+  
   nodeptr    
     p = selectRandomSubtree(tr);
   
@@ -615,7 +617,7 @@ static void doSPR(tree *tr, state *instate)
   //printf("%f \n", tr->likelihood);
 }
 
-static void resetSPR(state * instate)
+static void randomSPRReset(state * instate)
 {
   /* prune the insertion */
   hookup(instate->q, instate->r, instate->qz, instate->tr->numBranches);
@@ -627,24 +629,61 @@ static void resetSPR(state * instate)
 }
 
 
-static void dispatchProposalApply( prop proposal_type, state *instate ) {
+//simple sliding window
+static void simpleGammaProposalApply(state * instate)
+{
+  //TODO: add safety to max and min values
+  double newalpha, curv, r,mx,mn;
+  curv = instate->tr->partitionData[instate->model].alpha;
+  instate->curAlpha = curv;
+  r = (double)rand()/(double)RAND_MAX;
+  mn = curv-(instate->gm_sliding_window_w/2);
+  mx = curv+(instate->gm_sliding_window_w/2);
+  newalpha = fabs(mn + r * (mx-mn));
+  /* Ensure always you stay within this range */
+  if(newalpha > ALPHA_MAX) newalpha = ALPHA_MAX;
+  if(newalpha < ALPHA_MIN) newalpha = ALPHA_MIN;
+  instate->tr->partitionData[instate->model].alpha = newalpha;
+
+  makeGammaCats(instate->tr->partitionData[instate->model].alpha, instate->tr->partitionData[instate->model].gammaRates, 4, instate->tr->useMedian);
+
+  
+  evaluateGeneric(instate->tr, instate->tr->start, TRUE);
+}
+
+static void simpleGammaProposalReset(state * instate)
+{
+  instate->tr->partitionData[instate->model].alpha = instate->curAlpha;
+
+  makeGammaCats(instate->tr->partitionData[instate->model].alpha, instate->tr->partitionData[instate->model].gammaRates, 4, instate->tr->useMedian);
+
+  evaluateGeneric(instate->tr, instate->tr->start, TRUE);
+}
+
+
+static void dispatchProposalApply( proposal_type ptype, state *instate ) {
   //     assert(which_proposal == SPR || which_proposal == stNNI ||
 //            which_proposal == UPDATE_ALL_BL || which_proposal == UPDATE_SINGLE_BL || 
 //            which_proposal == UPDATE_MODEL || which_proposal == UPDATE_GAMMA );
   
-  switch( proposal_type ) {
+  switch( ptype ) {
     case UPDATE_MODEL:
-      simpleModelProposal(instate);
+      simpleModelProposalApply(instate);
       break;
       
     case UPDATE_ALL_BL:
-      simpleBranchLengthProposal(instate);
+      simpleBranchLengthProposalApply(instate);
       break;
       
     case UPDATE_SINGLE_BL:
-      randomBranchLengthProposal( instate );
+      randomBranchLengthProposalApply( instate );
       break;
     
+    case UPDATE_GAMMA:
+      simpleGammaProposalApply( instate );
+      break;
+ 
+      
       
     case SPR:
 //       if (randprop < 0.15)
@@ -652,7 +691,7 @@ static void dispatchProposalApply( prop proposal_type, state *instate ) {
 //       else
 //         instate->maxradius = 2;
       
-      doSPR(instate->tr, instate);  
+      randomSPRApply(instate);  
       break;
       
       
@@ -662,13 +701,13 @@ static void dispatchProposalApply( prop proposal_type, state *instate ) {
   
 }
 
-static prop selectProposalType(state * instate)
+static proposal_type selectProposalType(state * instate)
 /* so here the idea would be to randomly choose among proposals? we can use typedef enum to label each, and return that */ 
 {
   double randprop = (double)rand()/(double)RAND_MAX;
 //   boolean proposalSuccess;
   //double start_LH = evaluateGeneric(instate->tr, instate->tr->start); /* for validation */
-  prop proposal_type;
+//   proposal_type ptype;
   //simple proposal
   
 #if 0
@@ -746,30 +785,32 @@ static prop selectProposalType(state * instate)
   
   // select proposal type based on randprop
   if( randprop < 0.1 ) {
-    proposal_type = UPDATE_MODEL;
+    return UPDATE_MODEL;
+  } else if( randprop < 0.2 ) {
+    return UPDATE_GAMMA;
   } else if( 1 && randprop < 0.5 ) {
-    proposal_type = UPDATE_SINGLE_BL;
+    return UPDATE_SINGLE_BL;
    // proposal_type = UPDATE_ALL_BL;
 
   } else {
-    proposal_type = SPR;
+    return SPR;
   }
   
   
   
 
-  return proposal_type;
+//   return ptype;
 #endif
   
 }
 
-static void dispatchProposalReset(prop proposal_type, state * curstate)
+static void dispatchProposalReset(proposal_type proposal_type, state * curstate)
 {
   switch(proposal_type)
   {
 
     case SPR:
-      resetSPR(curstate);
+      randomSPRReset(curstate);
       break;
 #if 0
     case stNNI:
@@ -777,20 +818,20 @@ static void dispatchProposalReset(prop proposal_type, state * curstate)
       break;
 #endif
     case UPDATE_ALL_BL:
-      resetSimpleBranchLengthProposal(curstate);
+      simpleBranchLengthProposalReset(curstate);
       //printf("RESETBL\n");
       break;
 
     case UPDATE_SINGLE_BL:
-      resetRandomBranchLengthProposal(curstate);
+      randomBranchLengthProposalReset(curstate);
       break;
       
     case UPDATE_MODEL:
-      resetSimpleModelProposal(curstate);
+      simpleModelProposalReset(curstate);
       break;
-#if 0
+#if 1
     case UPDATE_GAMMA:
-      resetSimpleGammaProposal(curstate);
+      simpleGammaProposalReset(curstate);
       break;
 #endif
     default:
@@ -959,11 +1000,14 @@ void mcmc(tree *tr, analdef *adef)
   double gm_sliding_window_w = 0.75;
   double rt_sliding_window_w = 0.5;
   
-  srand(123);
+  int sum_radius_accept = 0;
+  int sum_radius_reject = 0;
+  
+  srand(124);
   
   tr->start = find_tip(tr->start, tr );
   
-  
+  FILE *log_h = fopen( "mcmc.txt", "w" );
   
   
   printf( "isTip: %d %d\n", tr->start->number, tr->mxtips );
@@ -1034,7 +1078,7 @@ void mcmc(tree *tr, analdef *adef)
   for(j=0; j<num_moves; j++)
   {
     perf_timer move_timer = perf_timer_make();
-    prop which_proposal;
+    proposal_type which_proposal;
     double t = gettime(); 
     double proposalTime = 0.0;
     double testr;
@@ -1079,23 +1123,18 @@ void mcmc(tree *tr, analdef *adef)
     acceptance = fmin(1,(curstate->hastings) * 
                        (exp(curstate->newprior-curstate->curprior)) * (exp(curstate->tr->likelihood-curstate->tr->startLH)));
     
-//     acceptance = exp(curstate->tr->likelihood-curstate->tr->startLH);
-    
-//     printf( "exp: %f\n", (curstate->tr->likelihood-curstate->tr->startLH) );
-//     printf( "curstate: %f %f %f\n", curstate->hastings, curstate->newprior, curstate->curprior );
-//     printf( "acc: %f %f\n", testr, acceptance );
-    /*
-      //printRecomTree(tr, FALSE, "after proposal");
-      printBothOpen("after proposal, iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
-    */
+
     
     perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
     if(processID == 0 && (j % 100) == 0) {
-      printf( "propb: %d %f %f %d spr: %lu (%lu) model: %lu (%lu) bl: %lu (%lu) %f %f %f\n", j, tr->likelihood, tr->startLH, testr < acceptance, accepted_spr, rejected_spr, accepted_model, rejected_model, accepted_bl, rejected_bl, curstate->hastings, curstate->newprior, curstate->curprior );
+      printf( "propb: %d %f %f %d spr: %lu (%lu) model: %lu (%lu) bl: %lu (%lu) ga: %lu (%lu) %f %f %f radius: %f %f\n", j, tr->likelihood, tr->startLH, testr < acceptance, accepted_spr, rejected_spr, accepted_model, rejected_model, accepted_bl, rejected_bl, accepted_gamma, rejected_gamma, curstate->hastings, curstate->newprior, curstate->curprior, sum_radius_accept / (float)accepted_spr, sum_radius_reject / (float)rejected_spr );
       
       printSubsRates(curstate->tr, curstate->model, curstate->numSubsRates);
       
       perf_timer_print( &all_timer );
+      
+      
+      fprintf( log_h, "%d %f %f\n", j, tr->likelihood, tr->startLH );
     }
     
     if(testr < acceptance)
@@ -1115,6 +1154,7 @@ void mcmc(tree *tr, analdef *adef)
           }
 #endif
           // printBothOpen("SPR new topology , iter %d tr LH %f, startLH %f\n", j, tr->likelihood, tr->startLH);
+          sum_radius_accept += spr_depth;
           accepted_spr++;
           break;
         case stNNI:       
@@ -1139,19 +1179,20 @@ void mcmc(tree *tr, analdef *adef)
           assert(0);
         }
 
-      //printBothOpen("accepted , iter %d tr LH %f, startLH %f, %i \n", j, tr->likelihood, tr->startLH, which_proposal);
+        //printBothOpen("accepted , iter %d tr LH %f, startLH %f, %i \n", j, tr->likelihood, tr->startLH, which_proposal);
       curstate->tr->startLH = curstate->tr->likelihood;  //new LH
       curstate->curprior = curstate->newprior;          
     }
     else
     {
       //printBothOpen("rejected , iter %d tr LH %f, startLH %f, %i \n", j, tr->likelihood, tr->startLH, which_proposal);
-    //print_proposal(which_proposal);
+      //print_proposal(which_proposal);
       dispatchProposalReset(which_proposal,curstate);
       
       switch(which_proposal)
         {
         case SPR:
+          sum_radius_reject += spr_depth;
           rejected_spr++;
           break;
         case stNNI:
