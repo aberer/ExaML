@@ -35,6 +35,7 @@
 
 
 
+
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
@@ -51,8 +52,9 @@
 /* pointers to reduction buffers for storing and gathering the first and second derivative 
    of the likelihood in Pthreads and MPI */
 
+#include "globalVariables.h"
 
-extern int processID;
+/* extern int processID; */
 extern const unsigned int mask32[32];
 
 /*******************/
@@ -850,6 +852,8 @@ void execCore(tree *tr, volatile double *_dlnLdlz, volatile double *_d2lnLdlz2)
 
 static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 {
+  int mpiErr;
+  boolean commSucceeded ;  
   double   z[NUM_BRANCHES], zprev[NUM_BRANCHES], zstep[NUM_BRANCHES];
   double  dlnLdlz[NUM_BRANCHES], d2lnLdlz2[NUM_BRANCHES];
   int i, maxiter[NUM_BRANCHES], model;
@@ -959,11 +963,34 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 #ifdef _USE_ALLREDUCE	  
 	/* the MPI_Allreduce implementation is apparently sometimes not deterministic */
 
-	MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);	    	    
+	mpiErr = MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, comm); 
 #else
-	MPI_Reduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(recv,        tr->numBranches * 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, 0, comm);
+	MPI_Bcast(recv,        tr->numBranches * 2, MPI_DOUBLE, 0, comm);
 #endif   
+
+#ifdef _USE_RTS
+#ifdef _USE_ALLREDUCE	
+	if(mpiErr == MPI_ERR_PROC_FAILED)
+	  OMPI_Comm_revoke(comm); 
+
+	commSucceeded = mpiErr == MPI_SUCCESS;
+	OMPI_Comm_agree(comm, &commSucceeded);
+	if(NOT commSucceeded)
+	  {
+	    printf("MPI_Allreduce failed in makenewz. Shrinking the communicator.\n"); 
+	    OMPI_Comm_revoke(comm); 
+	    OMPI_Comm_shrink(comm, &altComm); 
+	    /* MPI_Comm_free(comm);  */
+	    comm = altComm;
+	  } 
+#else 
+	/* currently not supporting the work around */
+	assert(0); 
+#endif
+#endif
+
+
 
 	memcpy(dlnLdlz,   &recv[0],               sizeof(double) * tr->numBranches);
 	memcpy(d2lnLdlz2, &recv[tr->numBranches], sizeof(double) * tr->numBranches);

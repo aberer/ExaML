@@ -41,9 +41,9 @@
 #include <ctype.h>
 #include <string.h>
 
-
-
 #include "axml.h"
+
+#include "globalVariables.h"
 
 extern int Thorough;
 extern int optimizeRateCategoryInvocations;
@@ -61,7 +61,7 @@ extern partitionLengths pLengths[MAX_MODEL];
 extern char binaryCheckpointName[1024];
 extern char binaryCheckpointInputName[1024];
 
-extern int processID;
+/* extern int processID; */
 
 boolean initrav (tree *tr, nodeptr p)
 { 
@@ -1524,7 +1524,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   
   /* initialization for the hash table to compute RF distances */
 
-  if(tr->searchConvergenceCriterion && processID == 0)   
+  if(tr->searchConvergenceCriterion && processID == 0)
     treeVectorLength = 1;
      
   /* initialize two lists of size 1 and size 20 that will keep track of the best 
@@ -1534,9 +1534,9 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   bestT->ninit = 0;
   initBestTree(bestT, 1, tr->mxtips);
       
-  bt = (bestlist *) malloc(sizeof(bestlist));      
+  bt = (bestlist *) malloc(sizeof(bestlist)); 
   bt->ninit = 0;
-  initBestTree(bt, 20, tr->mxtips);    
+  initBestTree(bt, 20, tr->mxtips); 
 
 
 
@@ -1777,7 +1777,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	      double 
 		rrf = convergenceCriterion(tr->h, tr->mxtips);
 	      
-	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
 	      
 	      if(rrf <= 0.01) /* 1% cutoff */
 		{
@@ -1797,7 +1797,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	  double 
 	    rrf;
 	  
-	  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
 	 
 	  if(rrf <= 0.01) /* 1% cutoff */		   
 	    goto cleanup_fast;	      
@@ -2055,7 +2055,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 		  double 
 		    rrf = convergenceCriterion(tr->h, tr->mxtips);
 		  
-		  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
 		  
 		  if(rrf <= 0.01) /* 1% cutoff */
 		    {
@@ -2073,7 +2073,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	      double 
 		rrf;
 	      
-	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
 	      
 	      if(rrf <= 0.01) /* 1% cutoff */		   
 		goto cleanup;	      

@@ -151,5 +151,13 @@ void startPthreads(tree *tr)
 
 
 }
+#else 
+#include "axml.h"
+void dummyFunction(int a); 
+
+void dummyFunction(int a)
+{
+  printf("o my god, this is annoying %d.\n" ,a ); 
+}
 
 #endif

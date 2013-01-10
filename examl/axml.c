@@ -47,8 +47,6 @@
 #include <stdarg.h>
 #include <limits.h>
 
-#include <mpi.h>
-
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #include <xmmintrin.h>
 /*
@@ -1894,8 +1892,10 @@ static void initializePartitions(tree *tr, FILE *byteFile)
       tr->partitionData[model].wgt = (int *)malloc_aligned(width * sizeof(int));	  
 
       /* rateCategory must be assigned using calloc() at start up there is only one rate category 0 for all sites */
-
+      
+      /* :TODO: reduce memory consumption?  */
       tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(int));
+      /* tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(unsigned char)); */
 
       if(width > 0 && tr->saveMemory)
 	{
@@ -2159,8 +2159,13 @@ int main (int argc, char *argv[])
 { 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &processID);
-  MPI_Comm_size(MPI_COMM_WORLD, &processes);
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Comm_size(comm, &processes);
+
+#ifdef _USE_RTS 
+  MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN);
+#endif
+  
+  MPI_Barrier(comm);
   
   {
     tree  *tr = (tree*)malloc(sizeof(tree));
@@ -2262,7 +2267,7 @@ int main (int argc, char *argv[])
   
   /* return 0 which means that our unix program terminated correctly, the return value is not 1 here */
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(comm);
   MPI_Finalize();
 
   return 0;

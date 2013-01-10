@@ -35,6 +35,9 @@
 
 #ifdef INCLUDE_DEFINITION 
 
+MPI_Comm comm = MPI_COMM_WORLD; 
+MPI_Comm  altComm; 
+
 
 
 int processes;
@@ -181,26 +184,30 @@ partitionLengths pLength;
 
 
 
-#ifdef _USE_PTHREADS
-volatile int             NumberOfJobs;
-volatile int             jobCycle = 0;
-volatile int             threadJob = 0;
-volatile int             NumberOfThreads;
-volatile double          *reductionBufferTwo;
-volatile double          *reductionBufferThree;
-volatile int             *reductionBufferParsimony;
-volatile char             *barrierBuffer;
+/* #ifdef _USE_PTHREADS */
+/* volatile int             NumberOfJobs; */
+/* volatile int             jobCycle = 0; */
+/* volatile int             threadJob = 0; */
+/* volatile int             NumberOfThreads; */
+/* volatile double          *reductionBufferTwo; */
+/* volatile double          *reductionBufferThree; */
+/* volatile int             *reductionBufferParsimony; */
+/* volatile char             *barrierBuffer; */
 
-volatile branchInfo      **branchInfos;
-pthread_mutex_t          mutex;
-#endif
+/* volatile branchInfo      **branchInfos; */
+/* pthread_mutex_t          mutex; */
+/* #endif */
 
 
 #else  /* only include declaration    */
 extern int processID;
+extern int processes; 
+
 extern volatile int             NumberOfThreads;
 extern volatile int             jobCycle;
 extern volatile int             threadJob;
 extern volatile char             *barrierBuffer;
 extern pthread_mutex_t          mutex;
+extern MPI_Comm comm; 
+extern MPI_Comm altComm; 
 #endif

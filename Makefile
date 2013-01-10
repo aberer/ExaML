@@ -9,8 +9,8 @@ SRCDIR:=./examl/
 
 
 # BEGIN customizable stuff 
-mode:=hybrid
-FEATURES :=  -D_USE_ALLREDUCE  -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE
+mode:=
+FEATURES :=  -D_USE_ALLREDUCE  -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE #    -D_USE_RTS
 WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare
 # END
 
@@ -51,6 +51,6 @@ clean:
 	@echo "[CLEAN]"
 	$(RM) $(OBJDIR) $(TEST_OBJ_DIR) $(DEBUG_OBJ_DIR) $(PROFILE_OBJ_DIR)  $(ALL_TARGETS)  *~ \#* callgrind* cachegrind*  gmon.out 
 
-
+ 
 include system/Makefile.build
 include system/Makefile.depend

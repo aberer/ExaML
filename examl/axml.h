@@ -45,6 +45,10 @@
 
 #include <mpi.h>
 
+#ifdef _USE_RTS
+#include <mpi-ext.h>
+#endif
+
 
 #define MAX_TIP_EV     0.999999999 /* max tip vector value, sum of EVs needs to be smaller than 1.0, otherwise the numerics break down */
 #define smoothings     32          /* maximum smoothing passes through tree */
