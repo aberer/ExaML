@@ -1,34 +1,36 @@
 #! /bin/bash
 
 
-numThread=2
-
 if [ $# != 2  ]; then
     echo "./script <debug> <numProc>"
     exit
 fi
 
+debugTarget=""
+execOutput="./examl-*"
 if [ $1 == 1 ]; then
-    gdb="urxvt -e  gdb --args"
+    gdb=" urxvt -e  gdb -ex run  --args "
+    debugTarget=" debug"
+    execOutput="./debug-examl-*"
 fi
 
-numThread=$2
-
-# aln="-s ../testdata/small.dna.binary"
-# tree="-t ../testdata/small.startingTree.dna.tree"
-
-aln="-s ../testdata/medium.dna.binary"
-tree="-t ../testdata/medium.startingTree.dna.tree"
-
-exec="./raxmlLight-MPI-SSE3"
-model=GAMMA
+num=$2
 
 
-make clean && make 
 
+aln="-s ./testData/49.binary"
+tree="-t ./testData/49.tree"
+
+# exec="./raxmlLight-MPI-SSE3"
+exec=$(ls -tr $execOutput | tail -n 1 )
+model=PSR
+
+
+args="$aln -m $model $tree -n tmp"
+export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
+export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
+
+make clean && make $debugTarget 
 rm -f  *.tmp ; 
-mpirun -np $numThread $gdb $exec $aln -m $model $tree -n tmp
 
-
-
-
+mpirun -am ft-enable-mpi -np $num $gdb $exec $args

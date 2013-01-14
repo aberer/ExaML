@@ -29,8 +29,34 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
+
+
+#ifndef _AXML_H
+#define _AXML_H
+
+
+#ifdef WIN32
+#include <direct.h>
+#endif
+
+#ifndef WIN32
+#include <sys/times.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <unistd.h>
+#endif
+
+#include <math.h>
+#include <time.h>
+#include <ctype.h>
+#include <string.h>
+#include <stdarg.h>
+#include <limits.h>
+
+
 #include "version.h"
 #include <assert.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -656,7 +682,7 @@ typedef  struct  {
 
   boolean grouped;
   boolean constrained;
-  int *partitionAssignment;     
+  int *partitionAssignment; 
  
   unsigned char *y_ptr; 
 
@@ -790,6 +816,12 @@ typedef  struct  {
   int threadID; 
 #endif
 
+
+#ifdef _USE_RTS
+  /* :TODO: store site to process mapping, if no multiprocessor
+     mapping is used.  */
+  int *siteToProcess; 
+#endif
 
 } tree;
 
@@ -1263,6 +1295,24 @@ threadData;
 
 void startPthreads(tree *tr); 
 void masterBarrier(int jobType, tree *tr); 
+#endif
 
 
+/* communication phases  */
+#define NUMBER_OF_PHASES 3 
+#define PHASE_BRANCH_OPT 0 
+#define PHASE_LNL_EVAL   1 
+#define PHASE_RATE_OPT   2
+
+
+/* this is a global singlelton */
+typedef struct _mpiState
+{
+  MPI_Comm comm;
+  int rank;
+  int commSize; 
+  int mpiError;
+  int generation[NUMBER_OF_PHASES];
+  int commPhase; 
+} examl_MPI_State; 
 #endif

@@ -29,22 +29,13 @@
  */
 
 
-
-
-
+#include "axml.h"
 
 #ifdef INCLUDE_DEFINITION 
 
-MPI_Comm comm = MPI_COMM_WORLD; 
-MPI_Comm  altComm; 
+examl_MPI_State mpiState; 
 
-
-
-int processes;
 double *globalResult;
-
-
-int processID;
 infoList iList;
 
 int Thorough = 0;
@@ -200,14 +191,10 @@ partitionLengths pLength;
 
 
 #else  /* only include declaration    */
-extern int processID;
-extern int processes; 
-
-extern volatile int             NumberOfThreads;
-extern volatile int             jobCycle;
-extern volatile int             threadJob;
-extern volatile char             *barrierBuffer;
-extern pthread_mutex_t          mutex;
-extern MPI_Comm comm; 
-extern MPI_Comm altComm; 
+extern examl_MPI_State mpiState; 
+/* extern volatile int             NumberOfThreads; */
+/* extern volatile int             jobCycle; */
+/* extern volatile int             threadJob; */
+/* extern volatile char             *barrierBuffer; */
+/* extern pthread_mutex_t          mutex; */
 #endif

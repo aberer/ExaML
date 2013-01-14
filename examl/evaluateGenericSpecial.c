@@ -48,6 +48,8 @@
 /*#include <tmmintrin.h>*/
 #endif
 
+#include "faultTolerance.h"
+
 
 #include "globalVariables.h"
 
@@ -672,8 +674,6 @@ void evaluateIterative(tree *tr)
 
 void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
 {
-  int mpiErr, commSucceeded; 
-
   /* now this may be the entry point of the library to compute 
      the log like at a branch defined by p and p->back == q */
 
@@ -741,37 +741,14 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   {
     double 
       *recv = (double *)malloc(sizeof(double) * tr->NumberOfModels);
-    
-#ifdef _USE_ALLREDUCE
-    mpiErr = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, comm);    
-#else
-    MPI_Reduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, 0, comm);
-    MPI_Bcast(recv, tr->NumberOfModels, MPI_DOUBLE, 0, comm);
-#endif
 
 
-
+    mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm);       
 #ifdef _USE_RTS
-#ifdef _USE_ALLREDUCE
-    if(mpiErr == MPI_ERR_PROC_FAILED)      
-      OMPI_Comm_revoke(comm);
-    
-
-    commSucceeded = mpiErr == MPI_SUCCESS; 
-    OMPI_Comm_agree(comm, &commSucceeded);
-    
-    if(NOT commSucceeded)
-      {
-	OMPI_Comm_revoke(comm); 
-	OMPI_Comm_shrink(comm, &altComm); 
-	/* MPI_Comm_free(comm);  */
-	comm = altComm; 
-	printf("MPI_Allreduce failed in evaluate. Shrinking the communicator.\n"); 
-      } 
-#else 
-    /* currently not supporting this work around */
-    assert(0); 
-#endif
+    mpiState.commPhase = PHASE_LNL_EVAL; 
+    mpiState.generation[PHASE_LNL_EVAL]++; 
+    if(mpiState.mpiError != MPI_SUCCESS)
+      handleMPIError(tr); 
 #endif
     
     memcpy(tr->perPartitionLH, recv, tr->NumberOfModels * sizeof(double));
@@ -786,12 +763,6 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   /* set the tree data structure likelihood value to the total likelihood */
 
   tr->likelihood = result;    
-  
-  /* 
-     MPI_Barrier(comm);
-     printf("Process %d likelihood: %f\n", processID, tr->likelihood);
-     MPI_Barrier(comm);
-  */
 
   /* do some bookkeeping to have traversalHasChanged in a consistent state */
 

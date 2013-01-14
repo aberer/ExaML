@@ -28,24 +28,8 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifdef WIN32
-#include <direct.h>
-#endif
 
-#ifndef WIN32
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h>
-#endif
-
-#include <math.h>
-#include <time.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdarg.h>
-#include <limits.h>
+#include "axml.h"
 
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #include <xmmintrin.h>
@@ -59,9 +43,9 @@
 */
 #endif
 
-#include "axml.h"
 
-#define  INCLUDE_DEFINITION
+
+#define INCLUDE_DEFINITION
 #include "globalVariables.h"
 #undef INCLUDE_DEFINITION
 
@@ -140,7 +124,7 @@ void *malloc_aligned(size_t size)
 
 static void printBoth(FILE *f, const char* format, ... )
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       va_list args;
       va_start(args, format);
@@ -155,7 +139,7 @@ static void printBoth(FILE *f, const char* format, ... )
 
 void printBothOpen(const char* format, ... )
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *f = myfopen(infoFileName, "ab");
       
@@ -356,7 +340,7 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{
-	  if(processID == 0)
+	  if(mpiState.rank == 0)
 	    printf("The file %s you want to open for reading does not exist, exiting ...\n", path);
 	  errorExit(-1);
 	  return (FILE *)NULL;
@@ -368,7 +352,7 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{
-	  if(processID == 0)
+	  if(mpiState.rank == 0)
 	    printf("The file %s ExaML wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
 		   path, mode);
 	  errorExit(-1);
@@ -765,7 +749,7 @@ static int mygetopt(int argc, char **argv, char *opts, int *optind, char **optar
 
 static void printVersionInfo(void)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  programName, programVersion, programDate); 
 }
 
@@ -791,7 +775,7 @@ static void printMinusFUsage(void)
 
 static void printREADME(void)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       printVersionInfo();
       printf("\n");  
@@ -976,7 +960,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
   /********* tr inits end*************/
 
 
-
+  
 
   while(!bad_opt && ((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:T:w:n:s:vhMSDQa", &optind, &optarg))!=-1))
     {
@@ -1043,7 +1027,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	    break;	    	  	  	     
 	  default:
 	    {
-	      if(processID == 0)
+	      if(mpiState.rank == 0)
 		{
 		  printf("Error select one of the following algorithms via -f :\n");
 		  printMinusFUsage();
@@ -1069,7 +1053,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 #ifdef _USE_PTHREADS
 	sscanf(optarg,"%d", &NumberOfThreads);
 #else
-	if(processID == 0)
+	if(mpiState.rank == 0)
 	  {
 	    printf("Option -T does not have any effect with the sequential or parallel MPI version.\n");
 	    printf("It is used to specify the number of threads for the Pthreads-based parallelization\n");
@@ -1084,7 +1068,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	strcpy(model,optarg);
 	if(modelExists(model, tr) == 0)
 	  {
-	    if(processID == 0)
+	    if(mpiState.rank == 0)
 	      {
 		printf("Rate heterogeneity Model %s does not exist\n\n", model);               
 		printf("For per site rates (called CAT in previous versions) use: PSR\n");	
@@ -1103,28 +1087,28 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 
   if(!byteFileSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError, you must specify a binary format data file with the \"-s\" option\n");
       errorExit(-1);
     }
 
   if(!modelSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError, you must specify a model of rate heterogeneity with the \"-m\" option\n");
       errorExit(-1);
     }
 
   if(!nameSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError: please specify a name for this run with -n\n");
       errorExit(-1);
     }
 
   if(!treeSet && !adef->useCheckpoint)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{
 	  printf("\nError: please either specify a starting tree for this run with -t\n");
 	  printf("or re-start the run from a checkpoint with -R\n");
@@ -1207,7 +1191,7 @@ static void makeFileNames(void)
 
   if(infoFileExists)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{
 	  printf("ExaML output files with the run ID <%s> already exist \n", run_id);
 	  printf("in directory %s ...... exiting\n", workdir);
@@ -1235,7 +1219,7 @@ static void makeFileNames(void)
 
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       int i, model;
       FILE *infoFile = myfopen(infoFileName, "ab");
@@ -1377,7 +1361,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *logFile;
       char temporaryFileName[1024] = "";
@@ -1460,7 +1444,7 @@ void printResult(tree *tr, analdef *adef, boolean finalPrint)
 
 void printLog(tree *tr)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *logFile;
       double t;
@@ -1527,7 +1511,7 @@ void getDataTypeString(tree *tr, int model, char typeOfData[1024])
 
 static void finalizeInfoFile(tree *tr, analdef *adef)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       double t;
 
@@ -1738,7 +1722,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
 	  int    
 	    i,
 	    k,
-	    n = processes,
+	    n = mpiState.commSize,
 	    p = numberOfPartitions[s],    
 	    *assignments = (int *)calloc(n, sizeof(int));  
 	  
@@ -1830,11 +1814,11 @@ static void initializePartitions(tree *tr, FILE *byteFile)
 
   if(tr->manyPartitions)
     {
-      multiprocessorScheduling(tr, processID);  
-      computeFractionMany(tr, processID);
+      multiprocessorScheduling(tr, mpiState.rank);  
+      computeFractionMany(tr, mpiState.rank);
     }
   else
-    computeFraction(tr, processID, processes);
+    computeFraction(tr, mpiState.rank, mpiState.commSize);
   	   
   maxCategories = tr->maxCategories;
 
@@ -1893,7 +1877,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
 
       /* rateCategory must be assigned using calloc() at start up there is only one rate category 0 for all sites */
       
-      /* :TODO: reduce memory consumption?  */
+      /* :TODO: reduce memory consumption? => has a significant influence on vectorized stuff later, careful!   */
       tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(int));
       /* tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(unsigned char)); */
 
@@ -1942,7 +1926,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
     {
       for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	{
-	  if(isThisMyPartition(tr, processID, model))
+	  if(isThisMyPartition(tr, mpiState.rank, model))
 	    {
 	      width = tr->partitionData[model].upper - tr->partitionData[model].lower;	     
 	      
@@ -1961,7 +1945,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
 	{
 	  for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
 	    {
-	      if(r % (size_t)processes == (size_t)processID)
+	      if(r % (size_t)mpiState.commSize == (size_t)mpiState.rank)
 		{
 		  tr->partitionData[model].wgt[localCounter] = tr->aliaswgt[globalCounter];	      	     		 		  					     
 		  
@@ -1984,7 +1968,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
 	{
 	  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	    {
-	      if(isThisMyPartition(tr, processID, model))	  
+	      if(isThisMyPartition(tr, mpiState.rank, model))	  
 		{
 		  memcpy(tr->partitionData[model].yVector[i], &(y[tr->partitionData[model].lower]), sizeof(unsigned char) * tr->partitionData[model].width);					    
 		  assert(tr->partitionData[model].width == tr->partitionData[model].upper - tr->partitionData[model].lower);
@@ -2004,7 +1988,7 @@ static void initializePartitions(tree *tr, FILE *byteFile)
 	    {
 	      for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
 		{
-		  if(r % (size_t)processes == (size_t)processID)
+		  if(r % (size_t)mpiState.commSize == (size_t)mpiState.rank)
 		    {		      
 		      tr->partitionData[model].yVector[i][localCounter] = y[globalCounter]; 	     
 		      
@@ -2091,7 +2075,7 @@ static void initializeTree(tree *tr, analdef *adef)
    
   setupTree(tr); 
   
-  if(tr->searchConvergenceCriterion && processID == 0)
+  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     {                     
       tr->bitVectors = initBitVector(tr->mxtips, &(tr->vLength));
       tr->h = initHashTable(tr->mxtips * 4);     
@@ -2155,17 +2139,37 @@ static void initializeTree(tree *tr, analdef *adef)
 }
 
 
-int main (int argc, char *argv[])
-{ 
+
+static void examl_initMPI(int argc, char **argv)
+{
+  /* :TODO: catch errors in this function  */
+
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &processID);
-  MPI_Comm_size(comm, &processes);
+  mpiState.comm = MPI_COMM_WORLD; 
+  /* mpiState.altComm = NULL;  */
+  MPI_Comm_rank(mpiState.comm, &mpiState.rank); 
+  /* mpiState.origRank = mpiState.rank;  */
+  MPI_Comm_size(mpiState.comm, &mpiState.commSize);
+  mpiState.mpiError = MPI_SUCCESS;
+  mpiState.generation[PHASE_BRANCH_OPT] = 0; 
+  mpiState.generation[PHASE_LNL_EVAL] = 0; 
+  mpiState.generation[PHASE_RATE_OPT] = 0; 
+  /* mpiState.failedProcesses = NULL;  */
 
 #ifdef _USE_RTS 
-  MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN);
+  MPI_Comm_set_errhandler(mpiState.comm, MPI_ERRORS_RETURN);
+  puts("Running with RTS activated"); 
 #endif
   
-  MPI_Barrier(comm);
+  /* :TODO:necessary?  */
+  MPI_Barrier(mpiState.comm);
+}
+
+
+
+int main (int argc, char *argv[])
+{ 
+  examl_initMPI(argc, argv);
   
   {
     tree  *tr = (tree*)malloc(sizeof(tree));
@@ -2209,7 +2213,7 @@ int main (int argc, char *argv[])
     
     initializeTree(tr, adef);                               
     
-    if(processID == 0)  
+    if(mpiState.rank == 0)  
       {
 	printModelAndProgramInfo(tr, adef, argc, argv);  
 	printBothOpen("Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
@@ -2233,7 +2237,7 @@ int main (int argc, char *argv[])
 	/* not important, only used to keep track of total accumulated exec time 
 	   when checkpointing and restarts were used */
 	
-	if(processID == 0)
+	if(mpiState.rank == 0)
 	  accumulatedTime = 0.0;
 	
 	/* get the starting tree: here we just parse the tree passed via the command line 
@@ -2261,13 +2265,13 @@ int main (int argc, char *argv[])
       
     /* print some more nonsense into the ExaML_info file */
   
-    if(processID == 0)
+    if(mpiState.rank == 0)
       finalizeInfoFile(tr, adef);
   }
   
   /* return 0 which means that our unix program terminated correctly, the return value is not 1 here */
 
-  MPI_Barrier(comm);
+  MPI_Barrier(mpiState.comm);
   MPI_Finalize();
 
   return 0;

@@ -1634,11 +1634,17 @@ static void gatherCatsWorker(tree *tr, int tid)
 	}		 		
     }
     
-  MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    (int*)NULL, (int*)NULL, (int*)NULL, MPI_INT,    0, comm);
-  MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, comm);
+  int mpiErr = MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    (int*)NULL, (int*)NULL, (int*)NULL, MPI_INT,    0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
+
+  if(mpiErr != MPI_SUCCESS)
+    {
+      puts("not implemented."); 
+      assert(0); 
+    }    
   
   free(catBufSend);
   free(rateBufSend);
@@ -1721,12 +1727,17 @@ static void gatherCatsMaster(tree *tr, int tid, int n)
 	  offsets += width; 	 	 
 	}	      
     }
-   
-  MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    catBufRecv,       countArray, offsetArray, MPI_INT,    0, comm);
-  MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, rateBufRecv,      countArray, offsetArray, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, countArray, offsetArray, MPI_DOUBLE, 0, comm);
-  MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, comm);	
+  
+  int mpiErr = MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    catBufRecv,       countArray, offsetArray, MPI_INT,    0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, rateBufRecv,      countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |=  MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);	
+  if(mpiErr != MPI_SUCCESS)
+    {
+      puts("not implemented."); 
+      assert(0); 
+    }
 
   for(model = 0; model < (size_t)tr->NumberOfModels; model++)
     {        
@@ -1755,7 +1766,7 @@ static void gatherCatsMaster(tree *tr, int tid, int n)
 	  if(numCAT[k] == 1)
 	    numCats++;
 	
-	if(isThisMyPartition(tr, processID, model))
+	if(isThisMyPartition(tr, mpiState.rank, model))
 	  assert(tr->partitionData[model].numberOfCategories == numCats);
 
 	tr->partitionData[model].numberOfCategories = numCats;
@@ -1813,7 +1824,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
     {            
       for(model = 0; model < tr->NumberOfModels; model++)
 	{
-	  if(isThisMyPartition(tr, processID, model))
+	  if(isThisMyPartition(tr, mpiState.rank, model))
 	    {
 	      int 	       
 		lower = tr->partitionData[model].lower,
@@ -1939,7 +1950,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	{
 	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
 	    {
-	      if(isThisMyPartition(tr, processID, model))
+	      if(isThisMyPartition(tr, mpiState.rank, model))
 		{
 		  int 
 		    localCount = 0,
@@ -1966,8 +1977,13 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	  a[0] = (double)accRat;
 	  a[1] = (double)accWgt;
 
-	  MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, comm);
-	  MPI_Bcast(r, 2, MPI_DOUBLE, 0, comm);
+	  int mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
+	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
+	  if(mpiErr != MPI_SUCCESS)
+	    {
+	      puts("not implemented."); 
+	      assert(0); 
+	    }
 	      
 	  accRat = r[0];
 	  dwgt   = r[1];
@@ -1978,7 +1994,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
 	  for(model = 0; model < tr->NumberOfModels; model++)
 	    {
-	      if(isThisMyPartition(tr, processID, model))
+	      if(isThisMyPartition(tr, mpiState.rank, model))
 		{
 		  for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
 		    tr->partitionData[model].perSiteRates[i] *= scaler;
@@ -1987,7 +2003,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
 	  for(model = 0, accRat = 0.0; model < tr->NumberOfModels; model++)
 	    {
-	      if(isThisMyPartition(tr, processID, model))
+	      if(isThisMyPartition(tr, mpiState.rank, model))
 		{
 		  int 
 		    localCount = 0,
@@ -2013,8 +2029,13 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	  a[0] = (double)accRat;
 	  a[1] = (double)accWgt;
 	  
-	  MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, comm);
-	  MPI_Bcast(r, 2, MPI_DOUBLE, 0, comm);
+	  mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
+	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
+	  if(mpiErr != MPI_SUCCESS)
+	    {
+	      puts("not implemented."); 
+	      assert(0); 
+	    }
 	  
 	  accRat = r[0];
 	  dwgt   = r[1];
@@ -2027,7 +2048,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	{
 	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
 	    {
-	      if(isThisMyPartition(tr, processID, model))
+	      if(isThisMyPartition(tr, mpiState.rank, model))
 		{
 		  int 
 		    localCount = 0,
@@ -2056,8 +2077,13 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	  a[0] = (double)accRat;
 	  a[1] = (double)accWgt;
 	  
-	  MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, comm);
-	  MPI_Bcast(r, 2, MPI_DOUBLE, 0, comm);
+	  int mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
+	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
+	  if(mpiErr != MPI_SUCCESS)
+	    {
+	      puts("not implemented."); 
+	      assert(0); 
+	    }
 	  
 	  accRat = r[0];
 	  dwgt   = r[1];
@@ -2069,7 +2095,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
       
        for(model = 0; model < tr->NumberOfModels; model++)
 	{
-	  if(isThisMyPartition(tr, processID, model))
+	  if(isThisMyPartition(tr, mpiState.rank, model))
 	    {
 	      int 
 		localCount = 0,
@@ -2095,7 +2121,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
       for(model = 0; model < tr->NumberOfModels; model++)
 	{  
-	  if(isThisMyPartition(tr, processID, model))	  	  	 
+	  if(isThisMyPartition(tr, mpiState.rank, model))	  	  	 
 	    {
 	      int 
 		localCount,
@@ -2112,16 +2138,16 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	}
     }  
 
-  if(processID == 0)    
-    gatherCatsMaster(tr, processID, processes);    
+  if(mpiState.rank == 0)    
+    gatherCatsMaster(tr, mpiState.rank, mpiState.commSize);    
   else    
-    gatherCatsWorker(tr, processID);    
+    gatherCatsWorker(tr, mpiState.rank);    
 }
 
 static void gatherRatesFewPartitions(tree *tr, int tid)
 {
   size_t
-    n = (size_t)processes;
+    n = (size_t)mpiState.commSize;
 
   if(tid == 0)
     {
@@ -2154,9 +2180,14 @@ static void gatherRatesFewPartitions(tree *tr, int tid)
 		}	    
 	  }
 
-        MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       sendBufferSize, MPI_DOUBLE, 0, comm);
-        MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, sendBufferSize, MPI_DOUBLE, 0, comm);
-        MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       sendBufferSize, MPI_DOUBLE, 0, comm);	
+        int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
+        mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
+        mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);	
+	if(mpiErr != MPI_SUCCESS)
+	  {
+	    puts("not implemented."); 
+	    assert(0); 
+	  }
 
         for(model = 0; model < tr->NumberOfModels; model++)
 	  {   	      
@@ -2207,9 +2238,14 @@ static void gatherRatesFewPartitions(tree *tr, int tid)
 	      }		  
 	}
       
-      MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, comm);
-      MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, comm);
-      MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, comm);
+      int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
+      mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
+      mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
+      if(mpiErr != MPI_SUCCESS)
+	{
+	  puts("not implemented."); 
+	  assert(0); 
+	}
       
       free(patBufSend);
       free(patStoredBufSend);
@@ -2217,27 +2253,44 @@ static void gatherRatesFewPartitions(tree *tr, int tid)
     }
 }
 
+
+/* :TODO: replace master/worker scheme here  */
 static void broadcastRatesFewPartitions(tree *tr, int tid)
 { 
   int 
     model;
   
   size_t
-    n = (size_t)processes;
+    n = (size_t)mpiState.commSize;
   
-  MPI_Bcast(tr->patrat, tr->originalCrunchedLength, MPI_DOUBLE, 0, comm);
-  MPI_Bcast(tr->patratStored, tr->originalCrunchedLength, MPI_DOUBLE, 0, comm);
+  int mpiErr = MPI_Bcast(tr->patrat, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Bcast(tr->patratStored, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
+  if(mpiErr != MPI_SUCCESS)
+    {
+      puts("not implemented."); 
+      assert(0); 
+    }
 
   for(model = 0; model < tr->NumberOfModels; model++)
     { 
-      MPI_Bcast(&(tr->partitionData[model].numberOfCategories), 1, MPI_INT, 0, comm);
-      MPI_Bcast(tr->partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories, MPI_DOUBLE, 0, comm);	   
+      mpiErr = MPI_Bcast(&(tr->partitionData[model].numberOfCategories), 1, MPI_INT, 0, mpiState.comm);
+      mpiErr |= MPI_Bcast(tr->partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories, MPI_DOUBLE, 0, mpiState.comm);	   
+      if(mpiErr != MPI_SUCCESS)
+	{
+	  puts("not implemented."); 
+	  assert(0); 
+	}
     }
 
 
-  MPI_Bcast(tr->rateCategory, tr->originalCrunchedLength, MPI_INT,    0, comm);
-  MPI_Bcast(tr->wr,                 tr->originalCrunchedLength, MPI_DOUBLE, 0, comm);
-  MPI_Bcast(tr->wr2,                tr->originalCrunchedLength, MPI_DOUBLE, 0, comm);
+  mpiErr = MPI_Bcast(tr->rateCategory, tr->originalCrunchedLength, MPI_INT,    0, mpiState.comm);
+  mpiErr |= MPI_Bcast(tr->wr,                 tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
+  mpiErr |= MPI_Bcast(tr->wr2,                tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
+  if(mpiErr != MPI_SUCCESS)
+    {
+      puts("not implemented."); 
+      assert(0); 
+    }
   
   for(model = 0; model < tr->NumberOfModels; model++)
     {
@@ -2258,7 +2311,13 @@ static void broadcastRatesFewPartitions(tree *tr, int tid)
 	}
     }
  
-  MPI_Barrier(comm);
+  /* :TODO: needed?  */
+  mpiErr = MPI_Barrier(mpiState.comm);
+  if(mpiErr != MPI_SUCCESS)
+    {
+      puts("not implemented."); 
+      assert(0); 
+    }
 }
 
 static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
@@ -2267,7 +2326,7 @@ static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
     i,
     model;
 
-  /*gatherRatesFewPartitions(tr, processID);*/
+  /*gatherRatesFewPartitions(tr, mpiState.rank);*/
   
   if(tr->numBranches > 1)
     {  
@@ -2478,7 +2537,7 @@ static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
 	}
     }         
   
-  broadcastRatesFewPartitions(tr, processID);
+  broadcastRatesFewPartitions(tr, mpiState.rank);
 }
 
 void updatePerSiteRates(tree *tr, boolean scaleRates)
@@ -2553,13 +2612,13 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       if(tr->manyPartitions)
 	{
 	  for(model = 0; model < tr->NumberOfModels; model++)      
-	    if(isThisMyPartition(tr, processID, model))
+	    if(isThisMyPartition(tr, mpiState.rank, model))
 	      optRateCatModel(tr, model, lower_spacing, upper_spacing, tr->lhs);
 	}
       else
 	{
-	  optRateCatPthreads(tr, lower_spacing, upper_spacing, tr->lhs, processes, processID);
-	  gatherRatesFewPartitions(tr, processID);
+	  optRateCatPthreads(tr, lower_spacing, upper_spacing, tr->lhs, mpiState.commSize, mpiState.rank);
+	  gatherRatesFewPartitions(tr, mpiState.rank);
 	}     
            
       for(model = 0; model < tr->NumberOfModels; model++)
@@ -2568,9 +2627,9 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 	    execute;
 	  
 	  if(tr->manyPartitions)
-	    execute = isThisMyPartition(tr, processID, model);
+	    execute = isThisMyPartition(tr, mpiState.rank, model);
 	  else
-	    execute = (processID == 0);
+	    execute = (mpiState.rank == 0);
  
 	  if(execute)
 	    {
@@ -2638,7 +2697,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       updatePerSiteRates(tr, TRUE);	
      
       /*
-	if(processID == 0)
+	if(mpiState.rank == 0)
 	{	  
 	  double sum = 0.0;
 	  int model;
@@ -2661,9 +2720,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       evaluateGeneric(tr, tr->start, TRUE);
 
       /* printf("%f \n", tr->likelihood); */
-      
-      /*MPI_Finalize();*/
-      
+
       if(tr->likelihood < initialLH)
 	{	 		  
 	  for(model = 0; model < tr->NumberOfModels; model++)

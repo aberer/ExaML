@@ -50,11 +50,11 @@
 #include <stdint.h>
 #include "axml.h"
 
-
+#include "globalVariables.h"
 
 extern const unsigned int mask32[32];
 
-extern int processID;
+/* extern int processID; */
 
 static void getxnodeBips (nodeptr p)
 {
@@ -324,8 +324,8 @@ static void newviewBipartitions(unsigned int **bitVectors, nodeptr p, int numsp,
     unsigned 
       int i;      
     
-    assert(processID == 0);
-    
+    /* :TODO: replace master/worker scheme   */
+    assert(mpiState.rank ==  0); 
 
     while(!p->xBips)
       {	
