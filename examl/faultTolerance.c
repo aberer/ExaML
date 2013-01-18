@@ -1,6 +1,10 @@
+#include <string.h>
+
 #include "axml.h"
 #include "globalVariables.h"
 #include "faultTolerance.h"
+#include "tree.h"
+
 
 
 /* TODO debug the SEGFAULT */
@@ -21,28 +25,6 @@
 
 #ifdef _USE_RTS
 
-static void appendToFailedProcList(int rank, List** failedProcs)
-{
-  int *tmp = calloc(1,sizeof(int)); 
-  List *elem = calloc(1,sizeof(List)); 
-  *tmp = rank; 
-  elem->value = tmp ;     
-  elem->next = *failedProcs; 
-  *failedProcs = elem; 
-}
-
-
-
-static void freeList(List *elem)
-{ 
-  List *iter = elem; 
-  while(iter != NULL)
-    {
-      List *tmp = iter->next; 
-      free(iter); 
-      iter = tmp; 
-    } 
-}
 
 /** 
     Obtains a repaired MPI communicator, an updated mapping and a list
@@ -56,76 +38,67 @@ static void freeList(List *elem)
     @return an MPI error code. 
 
 */
-static int getRepairedMPI_State(const tree *tr, List **failedProcs, examl_MPI_State **newState, int **newMapping)
-{
+static int getRepairedMPI_State(const tree *tr, examl_MPI_State **newState)
+{  
   int
-    mpiErr = MPI_SUCCESS, 
-    i, 
-    numFail = 0,
-    failCtr = 0,
-    *procArrayPtr = calloc(mpiState.commSize, sizeof(int)),
-    *procsTranslatedPtr = calloc(mpiState.commSize, sizeof(int)); 
-  MPI_Group failures ; 
-  MPI_Group allProc ; 
+    mpiErr = MPI_SUCCESS ; 
 
   assert(MPI_SUCCESS == 0); 
   assert(MPI_UNDEFINED < 0 ) ;  /* also just an assumption for convenience */
   
   *newState = calloc(1,sizeof(examl_MPI_State));
-  *newMapping = calloc(tr->manyPartitions ? tr->NumberOfModels : tr->originalCrunchedLength ,sizeof(int)); 
 
-  for(i = 0; i < mpiState.commSize; ++i)
-    procArrayPtr[i] = i; 
-  
-  mpiErr |= OMPI_Comm_failure_ack(mpiState.comm); 
-  mpiErr |= OMPI_Comm_failure_get_acked(mpiState.comm, &failures);
-  mpiErr |= MPI_Comm_group(mpiState.comm, &allProc);
-  mpiErr |= MPI_Group_translate_ranks(allProc, mpiState.commSize, procArrayPtr, failures, procsTranslatedPtr);   
-
-  for(i = 0; i < mpiState.commSize; ++i)
-    {
-      if(procsTranslatedPtr[i] != MPI_UNDEFINED)	
-	{
-	  appendToFailedProcList(i, failedProcs);
-	  failCtr++;
-	}
-    }
-
-  /* map sites to new rank system */
-  {
-    int
-      *pos = tr->manyPartitions ? tr->partitionAssignment : tr->siteToProcess,
-      *posEnd = tr->manyPartitions ? tr->partitionAssignment + tr->NumberOfModels : tr->siteToProcess + tr->originalCrunchedLength; 
-    int ctr = 0; 
-    for(; pos != posEnd; ++pos)
-      {
-	if(procsTranslatedPtr[*pos] == MPI_UNDEFINED)
-	  printf("[%d] %d -> OPEN\n", mpiState.rank, *pos); 
-	else 
-	  printf("[%d] %d -> %d\n",mpiState.rank, *pos, procsTranslatedPtr[*pos] ); 
-	(*newMapping)[ctr++] = procsTranslatedPtr[*pos]; /* NOTE: open work is assign MPI_UNDEFINED */
-      }
-  }
-  
-  mpiErr |= MPI_Group_size(failures, &numFail); 
-  
-  assert(numFail != 0); 
-  assert(numFail == failCtr); 
-   
   mpiErr |= OMPI_Comm_revoke(mpiState.comm);
   mpiErr |= OMPI_Comm_shrink(mpiState.comm, &((*newState)->comm)); 
 
   mpiErr |= MPI_Comm_set_errhandler((*newState)->comm, MPI_ERRORS_RETURN); 
   mpiErr |= MPI_Comm_rank((*newState)->comm, &((*newState)->rank)); 
   mpiErr |= MPI_Comm_size((*newState)->comm, &((*newState)->commSize)); 
-  mpiErr |= MPI_Group_free(&failures); 
-  
-  free(procArrayPtr); 
-  free(procsTranslatedPtr); 
 
   return mpiErr;   
 }
  
+
+
+static int getFailedProcesses(int *numFailedRanks, int **failedRanks) 
+{
+  int 
+    i,
+    mpiErr = MPI_SUCCESS, 
+    failCtr = 0,
+    *procArrayPtr = calloc(mpiState.commSize, sizeof(int)),
+    *procsTranslatedPtr = calloc(mpiState.commSize, sizeof(int)),
+    numFail = 0; 
+
+  MPI_Group failures ; 
+  MPI_Group allProc ; 
+
+  for(i = 0; i < mpiState.commSize; ++i)
+    procArrayPtr[i] = i; 
+
+  mpiErr |= OMPI_Comm_failure_ack(mpiState.comm); 
+  mpiErr |= OMPI_Comm_failure_get_acked(mpiState.comm, &failures);
+  mpiErr |= MPI_Comm_group(mpiState.comm, &allProc); 
+  mpiErr |= MPI_Group_translate_ranks(allProc, mpiState.commSize, procArrayPtr, failures, procsTranslatedPtr);  
+  mpiErr |= MPI_Group_size(failures, &numFail);   
+
+  *failedRanks = calloc(numFail, sizeof(int));   
+  int* rkPtr = *failedRanks; 
+  for(i = 0; i < mpiState.commSize; ++i)
+    if(procsTranslatedPtr[i] != MPI_UNDEFINED) 
+      rkPtr[failCtr++] = i ; 
+
+  assert(numFail > 0); 
+  assert(numFail == failCtr);
+
+  mpiErr |= MPI_Group_free(&failures);
+  free(procArrayPtr); 
+  free(procsTranslatedPtr); 
+
+  return mpiErr; 
+}
+
+
 
 static void restoreComm(examl_MPI_State *newState)
 {  
@@ -134,17 +107,118 @@ static void restoreComm(examl_MPI_State *newState)
   mpiState.commSize = newState->commSize; 
   mpiState.mpiError = MPI_SUCCESS; 
 
-  /* :TODO: is that all? */
-
   free(newState); 
 }
 
 
-/* void initLocalTreeForFailedProcs(tree *tr, tree *laocalTree, List *failedProcs) */
-/* { */
-/*   assert(0);  */
-/* } */
 
+int getMapOldToNewRanks(int *length, int **newRanks, examl_MPI_State *newState)
+{
+  int
+    i,
+    *oldRanks = (int*) calloc(newState->commSize, sizeof(int)) ,
+    mpiErr = MPI_SUCCESS;
+  
+  *newRanks = (int*) calloc(mpiState.commSize,sizeof(int)); 
+  memset(*newRanks, MPI_UNDEFINED,mpiState.commSize* sizeof(int)); 
+  *length = mpiState.commSize; 
+
+  mpiErr |= MPI_Allgather(&(mpiState.rank), 1, MPI_INT, oldRanks, 1, MPI_INT, newState->comm);
+  
+  /* invert the array  */
+  for(i = 0; i < newState->commSize ; ++i) 
+    (*newRanks)[oldRanks[i]] = i; 
+  
+  free(oldRanks);     
+  return mpiErr;
+}
+
+
+
+
+static void remapWorkAssignment(const tree* const tr, int *length, int **newAssignment, examl_MPI_State *newState)
+{
+  int
+    i,    
+    mapLength  = 0,
+    *mappedRanks = NULL ;   
+
+  MPI_Group allProc,
+    allProcNew ; 
+  
+  MPI_Comm_group(mpiState.comm, &allProc);
+  MPI_Comm_group(newState->comm, &allProcNew);
+
+  getMapOldToNewRanks(&mapLength, &mappedRanks, newState);
+
+  if(tr->manyPartitions)
+    {
+      pInfo** unassignedPartitions; 
+      int 
+	ctr = 0, 
+	*sitesPerProcess = calloc(newState->commSize,sizeof(int)), 
+	unassigned  = 0;
+      
+      *length = tr->NumberOfModels; 
+      *newAssignment = calloc(*length, sizeof(int));
+
+      /* update assignment with new ranks */
+      for(i = 0; i < tr->NumberOfModels; ++i ) 
+	{
+	  int rankNow = mappedRanks[tr->partitionAssignment[i]]; 
+	  (*newAssignment)[i] = rankNow; 
+	  if(rankNow == MPI_UNDEFINED)
+	    ++unassigned; 
+	  else 
+	    sitesPerProcess[rankNow] += tr->partitionData[i].width ; 	  
+	}
+      
+      unassignedPartitions = malloc(unassigned * sizeof(pInfo*)); 
+      for(i = 0; i < tr->NumberOfModels; ++i)
+	if((*newAssignment)[i] == MPI_UNDEFINED)
+	  unassignedPartitions[ctr++] = &(tr->partitionData[i]);
+
+      qsort(unassignedPartitions,  unassigned, sizeof(pInfo*), partComparePtr); 
+      
+      /* TODO continue */
+
+      
+      free(unassignedPartitions);
+      free(sitesPerProcess); 
+    }
+  else 
+    {
+      assert(0); 
+    }  
+
+
+  free(mappedRanks); 
+}
+
+
+
+
+
+
+
+static int computeMissingSamePhaseSameGen(const tree *tr, tree **localTree, examl_MPI_State *newState)
+{
+  int 
+    length = 0, 
+    *newPartitionAssignment = NULL, 
+    mpiErr = MPI_SUCCESS;   
+
+  *localTree = calloc(1,sizeof(tree));   
+  
+  /* setupTree(*localTree);  */
+
+  
+  remapWorkAssignment(tr,&length, &newPartitionAssignment, newState); 
+
+  /* TODO  */
+
+  return mpiErr; 
+}
 
 
 void execForFailedProcs(tree *tr)
@@ -160,15 +234,15 @@ void freeLocalTree(tree *localTree)
 }
 
 
-
 void consolidateData(tree *tr, tree *localTree)
 {
   assert(0); 
 
 
   
-  freeLocalTree(localTree); 
+
 }
+
 
 /** 
     Top-level function for handling MPI errors. 
@@ -184,7 +258,6 @@ void handleMPIError(tree *tr)
 {  
   int
     i,
-    *newMapping = NULL,  	/* of either the sites or the partitions to processes */
     *phaseOfProcPtr = NULL,
     *genOfProcPtr = NULL; 
   
@@ -196,6 +269,15 @@ void handleMPIError(tree *tr)
   examl_MPI_State
     *newState = NULL; 
 
+
+  if( NOT tr->manyPartitions)
+    {
+      puts("something went wrong, but FT not implemented for cyclic distribution."); 
+      MPI_Abort(mpiState.comm, -1); 
+    }    
+
+  puts("something went wrong. Starting recovery.") ; 
+
   while(erroneousState)
     {
       boolean samePhase = TRUE, 
@@ -203,14 +285,12 @@ void handleMPIError(tree *tr)
       
       erroneousState = FALSE; 
 
-      List *failedProcsUnprocessed = NULL ;      
-      erroneousState |= getRepairedMPI_State(tr, &failedProcsUnprocessed, &newState, &newMapping); 
-      
-      /* notify */
-      List *iter; 
-      for(iter = failedProcsUnprocessed; iter != NULL; iter = iter->next)
-	printf("%d detected failure of %d\n", mpiState.rank, ACCESS_LIST_INT(iter)); 
-      
+      erroneousState |= getRepairedMPI_State(tr, &newState); 
+
+      int *failedProcs = NULL; 
+      int numFailed = 0; 
+      erroneousState |= getFailedProcesses(&numFailed,&failedProcs);
+
       phaseOfProcPtr = calloc(newState->commSize,  sizeof(int)); 
       genOfProcPtr = calloc(newState->commSize, sizeof(int)); 
       
@@ -236,7 +316,6 @@ void handleMPIError(tree *tr)
 		}
 	    }
 
-
 	  sameGen &= (oneGen == genOfProcPtr[i]); 
 	  if(NOT sameGen)
 	    {
@@ -251,20 +330,26 @@ void handleMPIError(tree *tr)
 	}
       
       if(sameGen && samePhase)
-	{ 
-	  /* TODO  */
-	  puts("not implemented yet."); 
-	  assert(0); 
+	{ 	  
+	  tree *localTree = NULL; 
+	  computeMissingSamePhaseSameGen(tr, &localTree, newState);	  
 	}
       else 
 	{
 	  /* TODO  */
-	  puts("not implemented yet."); 
+	  puts("FT not implemented yet for failure during communication (where some processes got the correct result)."); 
 	  assert(0);
 	}
 
+
+
+      /* TODO repeat problematic communication */
+      
+      consolidateData(tr, localTree);
+      freeLocalTree(localTree); 
+
       /* free list, if we have to redo it */
-      freeList(failedProcsUnprocessed);
+      free(failedProcs); 
       free(phaseOfProcPtr); 
       free(genOfProcPtr);
       freeLocalTree(localTree); 

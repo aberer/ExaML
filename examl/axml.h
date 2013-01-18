@@ -57,6 +57,7 @@
 #include "version.h"
 #include <assert.h>
 #include <stdlib.h>
+/* #include <malloc.h> */
 #include <stdint.h>
 #include <stdio.h>
 
@@ -956,7 +957,7 @@ extern void mcmc(tree *tr, analdef *adef);
 #endif
 
 
-boolean isThisMyPartition(tree *localTree, int tid, int model);
+/* boolean isThisMyPartition(tree *localTree, int tid, int model); */
 
 
 extern void computePlacementBias(tree *tr, analdef *adef);
@@ -1316,3 +1317,6 @@ typedef struct _mpiState
   int commPhase; 
 } examl_MPI_State; 
 #endif
+
+
+#define IS_THIS_MY_PARTITION(tr,model) (assert(tr->manyPartitions),(tr->partitionAssignment[model] == mpiState.rank))

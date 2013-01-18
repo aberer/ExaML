@@ -3,6 +3,7 @@ PROGNAME=examl
 
 include system/Makefile.standard
 
+# Q:=
 
 CC:=$(Q) $(CCACHE) mpicc
 
@@ -11,7 +12,7 @@ SRCDIR:=./examl/
 
 # BEGIN customizable stuff 
 mode:=
-FEATURES := -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE     -D_USE_RTS
+FEATURES := -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE -D_USE_RTS
 WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare -Wno-strict-prototypes -Wno-missing-prototypes -Wno-old-style-definition -Wno-missing-declarations -Wno-unused-parameter
 # END 
 
@@ -34,7 +35,7 @@ SRC_EXCLUDE+=%avxLikelihood.c
 endif
 
 CFLAGS:= $(VECT_FLAG) $(OPT) $(LANG) $(FEATURES)
-DEBUG_CFLAGS := $(VECT_FLAG) $(LANG) $(FEATURES)
+DEBUG_CFLAGS := $(VECT_FLAG) $(LANG) $(FEATURES) -ggdb -D_DEBUG
 
 
 firstTarget : release 

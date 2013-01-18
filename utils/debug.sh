@@ -26,7 +26,7 @@ exec=$(ls -tr $execOutput | tail -n 1 )
 model=PSR
 
 
-args="$aln -m $model $tree -n tmp"
+args=" $aln -m $model $tree -n tmp -Q "
 export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
 export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
 

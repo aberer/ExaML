@@ -192,6 +192,8 @@ partitionLengths pLength;
 
 #else  /* only include declaration    */
 extern examl_MPI_State mpiState; 
+extern char byteFileName[1024];
+extern const unsigned int mask32[32]; 
 /* extern volatile int             NumberOfThreads; */
 /* extern volatile int             jobCycle; */
 /* extern volatile int             threadJob; */

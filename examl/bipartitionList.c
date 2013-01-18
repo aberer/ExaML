@@ -52,8 +52,8 @@
 
 #include "globalVariables.h"
 
-extern const unsigned int mask32[32];
 
+/* extern const unsigned int mask32[32]; */
 /* extern int processID; */
 
 static void getxnodeBips (nodeptr p)

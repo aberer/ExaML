@@ -54,8 +54,6 @@
 
 #include "globalVariables.h"
 
-/* extern int processID; */
-extern const unsigned int mask32[32];
 
 /*******************/
 
@@ -965,8 +963,6 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	if(mpiState.mpiError != MPI_SUCCESS)
 	    handleMPIError(tr); 
 #endif
-
-
 
 	memcpy(dlnLdlz,   &recv[0],               sizeof(double) * tr->numBranches);
 	memcpy(d2lnLdlz2, &recv[tr->numBranches], sizeof(double) * tr->numBranches);

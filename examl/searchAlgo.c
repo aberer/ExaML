@@ -1341,7 +1341,7 @@ void restart(tree *tr)
 }
 
 int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bestlist *bt, bestlist *bestML)
-{
+{				
   const 
     int MaxFast = 26;
   
@@ -1382,7 +1382,7 @@ int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bes
   assert(Thorough == 0);
 
   while(impr && maxtrav < MaxFast)
-    {	
+    { 
       recallBestTree(bestT, 1, tr);     
       nodeRectifier(tr);            
     
