@@ -1100,7 +1100,7 @@ extern void determineFullTraversal(nodeptr p, tree *tr);
 
 
 
-extern double evaluateGenericInitravPartition(tree *tr, nodeptr p, int model);
+/* extern double evaluateGenericInitravPartition(tree *tr, nodeptr p, int model); */
 extern void evaluateGenericVectorIterative(tree *, int startIndex, int endIndex);
 extern void categorizeIterative(tree *, int startIndex, int endIndex);
 

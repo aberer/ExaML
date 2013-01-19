@@ -672,7 +672,7 @@ void evaluateIterative(tree *tr)
 
 void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
 {
-  int mpiErr, commSucceeded; 
+  /* int mpiErr, commSucceeded;  */
 
   /* now this may be the entry point of the library to compute 
      the log like at a branch defined by p and p->back == q */
@@ -743,7 +743,8 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
       *recv = (double *)malloc(sizeof(double) * tr->NumberOfModels);
     
 #ifdef _USE_ALLREDUCE
-    mpiErr = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, comm);    
+    /* mpiErr =  */
+      MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, comm);    
 #else
     MPI_Reduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, 0, comm);
     MPI_Bcast(recv, tr->NumberOfModels, MPI_DOUBLE, 0, comm);

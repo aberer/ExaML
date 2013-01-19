@@ -852,8 +852,8 @@ void execCore(tree *tr, volatile double *_dlnLdlz, volatile double *_d2lnLdlz2)
 
 static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 {
-  int mpiErr;
-  boolean commSucceeded ;  
+  /* int mpiErr; */
+  /* boolean commSucceeded ;   */
   double   z[NUM_BRANCHES], zprev[NUM_BRANCHES], zstep[NUM_BRANCHES];
   double  dlnLdlz[NUM_BRANCHES], d2lnLdlz2[NUM_BRANCHES];
   int i, maxiter[NUM_BRANCHES], model;
@@ -963,7 +963,8 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 #ifdef _USE_ALLREDUCE	  
 	/* the MPI_Allreduce implementation is apparently sometimes not deterministic */
 
-	mpiErr = MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, comm); 
+	/* mpiErr =  */
+	MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, comm); 
 #else
 	MPI_Reduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, 0, comm);
 	MPI_Bcast(recv,        tr->numBranches * 2, MPI_DOUBLE, 0, comm);

@@ -776,13 +776,16 @@ static void printMinusFUsage(void)
 
   printf("              \"-f d\": new rapid hill-climbing \n");
   printf("                      DEFAULT: ON\n");
-
   printf("\n");
-
-  printf("              \"-f o\": old and slower rapid hill-climbing without heuristic cutoff\n");
   
+  printf("              \"-f o\": old and slower rapid hill-climbing without heuristic cutoff\n");  
   printf("\n");
+  
+  /* printf("              \"-f n\": compute the log likelihood score of all trees contained in a tree file provided by\n"); */
+  /* printf("                      \"-z\" under GAMMA or GAMMA+P-Invar\n"); */
 
+  printf("              \"-f e\": optimize model+branch lengths for given input tree under GAMMA/GAMMAI only\n");
+  
   printf("              DEFAULT for \"-f\": new rapid hill climbing\n");
 
   printf("\n");
@@ -943,11 +946,12 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     nameSet = 0,
     treeSet = 0,   
     modelSet = 0, 
+#ifdef _USE_PTHREADS
+    NumberOfThreads = 0,
+#endif
     byteFileSet = 0;
 
-#ifdef _USE_PTHREADS
-  NumberOfThreads = 0;
-#endif
+
 
 
   /*********** tr inits **************/ 
@@ -1040,7 +1044,13 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	  case 'o':
 	    adef->mode = BIG_RAPID_MODE;
 	    tr->doCutoff = FALSE;
-	    break;	    	  	  	     
+	    break;	    
+	  case 'e':
+	    adef->mode = TREE_EVALUATION;
+	    break;	    
+	  /* case 'n': */
+	  /*   adef->mode = COMPUTE_LHS;  */
+	  /*   break;  */
 	  default:
 	    {
 	      if(processID == 0)
@@ -1067,7 +1077,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
         break;
       case 'T':
 #ifdef _USE_PTHREADS
-	sscanf(optarg,"%d", &NumberOfThreads);
+	sscanf(optarg,"%d", &(tr->NumberOfThreads));
 #else
 	if(processID == 0)
 	  {
@@ -1101,6 +1111,10 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     }
 
 
+  /**************************/
+  /* argument sanity check  */
+  /**************************/
+  
   if(!byteFileSet)
     {
       if(processID == 0)
@@ -1131,6 +1145,19 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	}
       
       errorExit(-1);
+    }
+
+  
+  if(adef->mode == TREE_EVALUATION && tr->rateHetModel ==  CAT)
+    {
+      printf("Likelihood under PSR (formerly CAT) only meaningfull for equal rate to site assignment. Aborting. \n"); 
+      errorExit(-1); 
+    }
+
+  if(adef->useCheckpoint && adef->mode == TREE_EVALUATION)
+    {
+      printf("Checkpointing not implemented yet for likelihood evaluation mode. \n"); 
+      errorExit(-1); 
     }
   
    {
@@ -1168,6 +1195,9 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       }
    }
 
+   
+
+
   return;
 }
 
@@ -1177,6 +1207,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 void errorExit(int e)
 {
   MPI_Finalize();
+ 
 
   exit(e);
 }
@@ -1261,9 +1292,16 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
       switch(adef->mode)
 	{	
+	  break;
 	case  BIG_RAPID_MODE:	 
 	  printBoth(infoFile, "\nExaML rapid hill-climbing mode\n\n");
 	  break;	
+	case TREE_EVALUATION :
+	  printBoth(infoFile, "\nRAxML Model Optimization up to an accuracy of %f log likelihood units\n\n", adef->likelihoodEpsilon);
+	  break;      
+	/* case COMPUTE_LHS: */
+	/*   printBoth(infoFile, "\nExaML computation of likelihoods for a set of trees\n\n"); */
+	/*   break;  */
 	default:
 	  assert(0);
 	}
@@ -1276,8 +1314,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 	printBoth(infoFile, "Using %d distinct models/data partitions with joint branch length optimization\n\n\n", tr->NumberOfModels);	
 	
 
-      
-     
+    
 
 
       
@@ -1536,6 +1573,16 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
 
       switch(adef->mode)
 	{	
+	case TREE_EVALUATION: 
+	  printBothOpen("\n\nOverall Time for Tree Evaluation %f\n", t);
+	  printBothOpen("\n\n");
+
+	  /* TODO */
+	  /* printModelParams(tr, adef); */
+
+	  printBothOpen("Final tree written to:                 %s\n", resultFileName);
+	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
+
 	case  BIG_RAPID_MODE:	 
 	  printBothOpen("\n\nOverall Time for 1 Inference %f\n", t);
 	  printBothOpen("\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime);
@@ -2155,6 +2202,7 @@ static void initializeTree(tree *tr, analdef *adef)
 }
 
 
+
 int main (int argc, char *argv[])
 { 
   MPI_Init(&argc, &argv);
@@ -2201,7 +2249,7 @@ int main (int argc, char *argv[])
 #ifdef _USE_PTHREADS
     startPthreads(tr);
     
-    assert(NumberOfThreads != 0); 
+    assert(tr->NumberOfThreads != 0); 
     /* masterBarrier(THREAD_INIT_PARTITION, tr); */
     /* if(!adef->readTaxaOnly) */
     /*   masterBarrier(THREAD_ALLOC_LIKELIHOOD, tr); */
@@ -2232,7 +2280,8 @@ int main (int argc, char *argv[])
       {
 	/* not important, only used to keep track of total accumulated exec time 
 	   when checkpointing and restarts were used */
-	
+
+
 	if(processID == 0)
 	  accumulatedTime = 0.0;
 	
@@ -2241,22 +2290,23 @@ int main (int argc, char *argv[])
 	   which we maybe should skeip, TODO */
 	       	
 	getStartingTree(tr);     
-	   	          
-	/* 
-	   here we do an initial full tree traversal on the starting tree using the Felsenstein pruning algorithm 
-	   This should basically be the first call to the library that actually computes something :-)
-	*/
-      
-	evaluateGeneric(tr, tr->start, TRUE);	
-	
-	/* the treeEvaluate() function repeatedly iterates over the entire tree to optimize branch lengths until convergence */
-      	
-	treeEvaluate(tr, 1); 
 
-	/* now start the ML search algorithm */
-      
-
-	computeBIGRAPID(tr, adef, TRUE); 			     
+	switch(adef->mode)
+	  {
+	  case TREE_EVALUATION: 
+	    printf("Likelihood accuracy set to %f\n", adef->likelihoodEpsilon);
+	    modOpt(tr, adef->likelihoodEpsilon);
+	    printLog(tr);
+	    printResult(tr, adef, TRUE);  	    
+	    break; 
+	  case BIG_RAPID_MODE:
+	    evaluateGeneric(tr, tr->start, TRUE); 
+	    treeEvaluate(tr, 1); 
+	    computeBIGRAPID(tr, adef, TRUE); 
+	    break; 
+	  default:
+	    assert(0);
+	  }
       }            
       
     /* print some more nonsense into the ExaML_info file */

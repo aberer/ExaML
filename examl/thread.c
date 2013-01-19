@@ -19,30 +19,30 @@
 
 
 
-static void execFunction(tree *tr, tree *localTree, int tid, int n)
-{
-  int
-    currentJob
-    ;
+/* static void execFunction(tree *tr, tree *localTree, int tid, int n) */
+/* { */
+/*   int */
+/*     currentJob */
+/*     ; */
 
-  currentJob = threadJob >> 16;
+/*   currentJob = threadJob >> 16; */
 
-  switch(currentJob)
-  {            
-  case 0: 
-  case 13: 
-    {
-      printf("worker %d/%d has nothing to do\n", tid, processID); 
-      sleep(1);
-      break; 
-    }
-  default:
-    printf("Job %d\n", currentJob);
-    assert(0);
-  }
+/*   switch(currentJob) */
+/*   {             */
+/*   case 0:  */
+/*   case 13:  */
+/*     { */
+/*       printf("worker %d/%d has nothing to do\n", tid, processID);  */
+/*       sleep(1); */
+/*       break;  */
+/*     } */
+/*   default: */
+/*     printf("Job %d\n", currentJob); */
+/*     assert(0); */
+/*   } */
 
   
-}
+/* } */
 
 
 

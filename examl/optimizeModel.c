@@ -2915,28 +2915,17 @@ void modOpt(tree *tr, double likelihoodEpsilon)
   tr->start = tr->nodep[1];
                  
   do
-    {           
+    { 
       currentLikelihood = tr->likelihood;     
      
-     
-
       optRatesGeneric(tr, modelEpsilon, rateList);
       
-      
-      
-      
-
       evaluateGeneric(tr, tr->start, TRUE);                                       
-     
       
-     
-
       autoProtein(tr);
 
       treeEvaluate(tr, 0.0625);      
-
       
-
       switch(tr->rateHetModel)
 	{
 	case GAMMA:      
@@ -2957,11 +2946,12 @@ void modOpt(tree *tr, double likelihoodEpsilon)
 	  break;	  
 	default:
 	  assert(0);
-	}                   
-      
+	} 
        
-      
       printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood));    
+
+      /* puts("finished one step of optimization");  */
+
     }
   while(fabs(currentLikelihood - tr->likelihood) > likelihoodEpsilon);  
   
