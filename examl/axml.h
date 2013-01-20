@@ -788,6 +788,7 @@ typedef  struct  {
 
 #ifdef _USE_PTHREADS
   int threadID; 
+  int numberOfThreads; 
 #endif
 
 

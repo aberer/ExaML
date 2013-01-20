@@ -9,9 +9,9 @@ SRCDIR:=./examl/
 
 
 # BEGIN customizable stuff 
-mode:=
+mode:=hybrid
 FEATURES := -D_USE_ALLREDUCE -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE     # -D_USE_RTS
-WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare
+WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare -Wno-old-style-definition -Wno-missing-prototypes -Wno-strict-prototypes -Wno-missing-declarations
 # END
 
 
