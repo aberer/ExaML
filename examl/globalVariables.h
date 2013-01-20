@@ -175,7 +175,7 @@ partitionLengths pLength;
 
 
 
-/* #ifdef _USE_PTHREADS */
+#ifdef _HYBRID
 /* volatile int             NumberOfJobs; */
 /* volatile int             jobCycle = 0; */
 /* volatile int             threadJob = 0; */
@@ -187,7 +187,7 @@ partitionLengths pLength;
 
 /* volatile branchInfo      **branchInfos; */
 /* pthread_mutex_t          mutex; */
-/* #endif */
+#endif
 
 
 #else  /* only include declaration    */

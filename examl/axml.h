@@ -1230,19 +1230,10 @@ extern void newviewGTRGAMMAPROT_AVX(int tipCase,
 
 
 
+
+/* THE BELOW IS USELESS!!!  */
 /* thread specific stuff */
 #ifdef _USE_PTHREADS
-
-typedef struct
-{
-  tree *tr;
-  int threadNumber;
-}
-threadData;
-
-
-
-
 /* work tags for parallel regions */
 /* :TODO: reduce   */
 #define THREAD_NEWVIEW                0
@@ -1298,6 +1289,18 @@ void masterBarrier(int jobType, tree *tr);
 #define PHASE_RATE_OPT   2
 
 
+
+#ifdef _HYBRID 
+typedef struct
+{
+  tree *tr;
+  analdef *adef; 
+  int threadNumber;
+}
+threadData;
+#endif
+
+
 /* this is a global singlelton */
 typedef struct _mpiState
 {
@@ -1307,6 +1310,13 @@ typedef struct _mpiState
   int mpiError;
   int generation[NUMBER_OF_PHASES];
   int commPhase; 
+
+#ifdef _HYBRID
+  int numberOfThreads;   
+  volatile char *barrier; 
+  pthread_t *threads; 
+#endif
+
 } examl_MPI_State; 
 #endif
 
