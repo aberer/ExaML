@@ -71,8 +71,6 @@ extern const char inverseMeaningDNA[16];
 
 /* a pre-computed 32-bit integer mask */
 
-extern const unsigned int mask32[32];
-
 /* the function below computes the P matrix from the decomposition of the Q matrix and the respective rate categories for a single partition */
    
 

@@ -101,6 +101,12 @@ stringHashtable *initStringHashTable(hashNumberType n)
 }
 
 
+boolean whitechar (int ch)
+{
+  return (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r');
+}
+
+
 static hashNumberType  hashString(char *p, hashNumberType tableSize)
 {
   hashNumberType h = 0;

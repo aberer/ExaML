@@ -1,3 +1,14 @@
+Note that this repository is PURELY for developmental purposes. 
+
+If you clone from this repository, do NOT expect to get correct
+result!
+
+For production level code, please visit 
+https://github.com/stamatak/ExaML
+
+
+
+
 ExaML
 =====
 

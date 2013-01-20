@@ -800,9 +800,6 @@ typedef  struct  {
   double lzi[NUM_BRANCHES];
 
  
- 
-
-
   unsigned int **bitVectors;
 
   unsigned int vLength;
@@ -812,12 +809,6 @@ typedef  struct  {
   char bits_in_16bits [0x1u << 16];
   
   boolean useMedian;
-
-#ifdef _USE_PTHREADS
-  int threadID; 
-  int numberOfThreads; 
-#endif
-
 
 #ifdef _USE_RTS
   /* :TODO: store site to process mapping, if no multiprocessor
