@@ -9,16 +9,16 @@ SRCDIR:=./examl/
 
 
 # BEGIN customizable stuff 
-mode:=hybrid
-FEATURES := -D_USE_ALLREDUCE -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE     # -D_USE_RTS
-WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare -Wno-old-style-definition -Wno-missing-prototypes -Wno-strict-prototypes -Wno-missing-declarations
-# END
+mode:=
+FEATURES := -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE -D_USE_RTS
+WARNING_OFF := -Wno-declaration-after-statement -std=c99  -Wno-sign-compare -Wno-strict-prototypes -Wno-missing-prototypes -Wno-old-style-definition -Wno-missing-declarations -Wno-unused-parameter
+# END 
 
 
 DEPS=$(SRCDIR)/axml.h $(SRCDIR)/globalVariables.h
 LFLAGS = -lm
 OPT :=  -O2 -fomit-frame-pointer -funroll-loops -march=native
-WARN := -Wall -pedantic -Wunused-parameter -Wredundant-decls  -Wreturn-type  -Wswitch-default -Wunused-value -Wimplicit  -Wimplicit-function-declaration  -Wimplicit-int -Wimport  -Wunused  -Wunused-function  -Wunused-label -Wno-int-to-pointer-cast -Wbad-function-cast  -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs  -Wold-style-definition -Wstrict-prototypes  -Wdeclaration-after-statement -Wpointer-sign -Wextra -Wredundant-decls -Wunused -Wunused-function -Wunused-parameter -Wunused-value  -Wunused-variable -Wformat  -Wformat-nonliteral -Wparentheses -Wsequence-point -Wuninitialized -Wundef -Wbad-function-cast  $(WARNING_OFF)
+WARN := -Wall -pedantic  -Wunused-parameter -Wredundant-decls  -Wreturn-type  -Wswitch-default -Wunused-value -Wimplicit  -Wimplicit-function-declaration  -Wimplicit-int -Wimport  -Wunused  -Wunused-function  -Wunused-label -Wno-int-to-pointer-cast -Wbad-function-cast  -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs  -Wold-style-definition -Wstrict-prototypes  -Wdeclaration-after-statement -Wpointer-sign -Wextra -Wredundant-decls -Wunused -Wunused-function -Wunused-parameter -Wunused-value  -Wunused-variable -Wformat  -Wformat-nonliteral -Wparentheses -Wsequence-point -Wuninitialized -Wundef -Wbad-function-cast  $(WARNING_OFF)
 LANG =  -D_GNU_SOURCE $(WARN) 
 
 
@@ -33,7 +33,7 @@ SRC_EXCLUDE+=%avxLikelihood.c
 endif
 
 CFLAGS:= $(VECT_FLAG) $(OPT) $(LANG) $(FEATURES)
-DEBUG_CFLAG := $(VECT_FLAG) $(LANG) $(FEATURES)
+DEBUG_CFLAGS := $(VECT_FLAG) $(LANG) $(FEATURES) -ggdb -D_DEBUG
 
 
 firstTarget : release 

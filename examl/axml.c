@@ -28,24 +28,9 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifdef WIN32
-#include <direct.h>
-#endif
 
-#ifndef WIN32
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h>
-#endif
-
-#include <math.h>
-#include <time.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdarg.h>
-#include <limits.h>
+#include "axml.h"
+#include "tree.h" 
 
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #include <xmmintrin.h>
@@ -58,8 +43,6 @@
   #define MM_DAZ_OFF    0x0000
 */
 #endif
-
-#include "axml.h"
 
 #define  INCLUDE_DEFINITION
 #include "globalVariables.h"
@@ -140,7 +123,7 @@ void *malloc_aligned(size_t size)
 
 static void printBoth(FILE *f, const char* format, ... )
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       va_list args;
       va_start(args, format);
@@ -155,7 +138,7 @@ static void printBoth(FILE *f, const char* format, ... )
 
 void printBothOpen(const char* format, ... )
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *f = myfopen(infoFileName, "ab");
       
@@ -356,7 +339,7 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{
-	  if(processID == 0)
+	  if(mpiState.rank == 0)
 	    printf("The file %s you want to open for reading does not exist, exiting ...\n", path);
 	  errorExit(-1);
 	  return (FILE *)NULL;
@@ -368,7 +351,7 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{
-	  if(processID == 0)
+	  if(mpiState.rank == 0)
 	    printf("The file %s ExaML wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
 		   path, mode);
 	  errorExit(-1);
@@ -765,7 +748,7 @@ static int mygetopt(int argc, char **argv, char *opts, int *optind, char **optar
 
 static void printVersionInfo(void)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  programName, programVersion, programDate); 
 }
 
@@ -776,16 +759,13 @@ static void printMinusFUsage(void)
 
   printf("              \"-f d\": new rapid hill-climbing \n");
   printf("                      DEFAULT: ON\n");
-  printf("\n");
-  
-  printf("              \"-f o\": old and slower rapid hill-climbing without heuristic cutoff\n");  
-  printf("\n");
-  
-  /* printf("              \"-f n\": compute the log likelihood score of all trees contained in a tree file provided by\n"); */
-  /* printf("                      \"-z\" under GAMMA or GAMMA+P-Invar\n"); */
 
-  printf("              \"-f e\": optimize model+branch lengths for given input tree under GAMMA/GAMMAI only\n");
+  printf("\n");
+
+  printf("              \"-f o\": old and slower rapid hill-climbing without heuristic cutoff\n");
   
+  printf("\n");
+
   printf("              DEFAULT for \"-f\": new rapid hill climbing\n");
 
   printf("\n");
@@ -794,7 +774,7 @@ static void printMinusFUsage(void)
 
 static void printREADME(void)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       printVersionInfo();
       printf("\n");  
@@ -948,9 +928,8 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     modelSet = 0, 
     byteFileSet = 0;
 
-
 #ifdef _USE_PTHREADS
-  tr->numberOfThreads = 0; 
+  NumberOfThreads = 0;
 #endif
 
 
@@ -1044,16 +1023,10 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	  case 'o':
 	    adef->mode = BIG_RAPID_MODE;
 	    tr->doCutoff = FALSE;
-	    break;	    
-	  case 'e':
-	    adef->mode = TREE_EVALUATION;
-	    break;	    
-	  /* case 'n': */
-	  /*   adef->mode = COMPUTE_LHS;  */
-	  /*   break;  */
+	    break;	    	  	  	     
 	  default:
 	    {
-	      if(processID == 0)
+	      if(mpiState.rank == 0)
 		{
 		  printf("Error select one of the following algorithms via -f :\n");
 		  printMinusFUsage();
@@ -1077,9 +1050,9 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
         break;
       case 'T':
 #ifdef _USE_PTHREADS
-	sscanf(optarg,"%d", &(tr->numberOfThreads));
+	sscanf(optarg,"%d", &NumberOfThreads);
 #else
-	if(processID == 0)
+	if(mpiState.rank == 0)
 	  {
 	    printf("Option -T does not have any effect with the sequential or parallel MPI version.\n");
 	    printf("It is used to specify the number of threads for the Pthreads-based parallelization\n");
@@ -1094,7 +1067,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	strcpy(model,optarg);
 	if(modelExists(model, tr) == 0)
 	  {
-	    if(processID == 0)
+	    if(mpiState.rank == 0)
 	      {
 		printf("Rate heterogeneity Model %s does not exist\n\n", model);               
 		printf("For per site rates (called CAT in previous versions) use: PSR\n");	
@@ -1111,53 +1084,36 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     }
 
 
-  /**************************/
-  /* argument sanity check  */
-  /**************************/
-  
   if(!byteFileSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError, you must specify a binary format data file with the \"-s\" option\n");
       errorExit(-1);
     }
 
   if(!modelSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError, you must specify a model of rate heterogeneity with the \"-m\" option\n");
       errorExit(-1);
     }
 
   if(!nameSet)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	printf("\nError: please specify a name for this run with -n\n");
       errorExit(-1);
     }
 
   if(!treeSet && !adef->useCheckpoint)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{
 	  printf("\nError: please either specify a starting tree for this run with -t\n");
 	  printf("or re-start the run from a checkpoint with -R\n");
 	}
       
       errorExit(-1);
-    }
-
-  
-  if(adef->mode == TREE_EVALUATION && tr->rateHetModel ==  CAT)
-    {
-      printf("Likelihood under PSR (formerly CAT) only meaningfull for equal rate to site assignment. Aborting. \n"); 
-      errorExit(-1); 
-    }
-
-  if(adef->useCheckpoint && adef->mode == TREE_EVALUATION)
-    {
-      printf("Checkpointing not implemented yet for likelihood evaluation mode. \n"); 
-      errorExit(-1); 
     }
   
    {
@@ -1195,9 +1151,6 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       }
    }
 
-   
-
-
   return;
 }
 
@@ -1207,7 +1160,6 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 void errorExit(int e)
 {
   MPI_Finalize();
- 
 
   exit(e);
 }
@@ -1238,7 +1190,7 @@ static void makeFileNames(void)
 
   if(infoFileExists)
     {
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{
 	  printf("ExaML output files with the run ID <%s> already exist \n", run_id);
 	  printf("in directory %s ...... exiting\n", workdir);
@@ -1266,7 +1218,7 @@ static void makeFileNames(void)
 
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       int i, model;
       FILE *infoFile = myfopen(infoFileName, "ab");
@@ -1292,16 +1244,9 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
       switch(adef->mode)
 	{	
-	  break;
 	case  BIG_RAPID_MODE:	 
 	  printBoth(infoFile, "\nExaML rapid hill-climbing mode\n\n");
 	  break;	
-	case TREE_EVALUATION :
-	  printBoth(infoFile, "\nRAxML Model Optimization up to an accuracy of %f log likelihood units\n\n", adef->likelihoodEpsilon);
-	  break;      
-	/* case COMPUTE_LHS: */
-	/*   printBoth(infoFile, "\nExaML computation of likelihoods for a set of trees\n\n"); */
-	/*   break;  */
 	default:
 	  assert(0);
 	}
@@ -1314,7 +1259,8 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 	printBoth(infoFile, "Using %d distinct models/data partitions with joint branch length optimization\n\n\n", tr->NumberOfModels);	
 	
 
-    
+      
+     
 
 
       
@@ -1414,7 +1360,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *logFile;
       char temporaryFileName[1024] = "";
@@ -1497,7 +1443,7 @@ void printResult(tree *tr, analdef *adef, boolean finalPrint)
 
 void printLog(tree *tr)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       FILE *logFile;
       double t;
@@ -1564,7 +1510,7 @@ void getDataTypeString(tree *tr, int model, char typeOfData[1024])
 
 static void finalizeInfoFile(tree *tr, analdef *adef)
 {
-  if(processID == 0)
+  if(mpiState.rank == 0)
     {
       double t;
 
@@ -1573,16 +1519,6 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
 
       switch(adef->mode)
 	{	
-	case TREE_EVALUATION: 
-	  printBothOpen("\n\nOverall Time for Tree Evaluation %f\n", t);
-	  printBothOpen("\n\n");
-
-	  /* TODO */
-	  /* printModelParams(tr, adef); */
-
-	  printBothOpen("Final tree written to:                 %s\n", resultFileName);
-	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
-
 	case  BIG_RAPID_MODE:	 
 	  printBothOpen("\n\nOverall Time for 1 Inference %f\n", t);
 	  printBothOpen("\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime);
@@ -1768,438 +1704,19 @@ static void multiprocessorScheduling(tree *tr, int tid)
 	    numberOfPartitions[s] += 1;
 	}
 
-      assert(exists);
-    }
-
-  if(tid == 0)
-    printBothOpen("\nMulti-processor partition data distribution enabled (-Q option)\n");
-
-  for(s = 0; s < arrayLength; s++)
-    {
-      if(numberOfPartitions[s] > 0)
-	{
-	  size_t   
-	    checkSum = 0,
-	    sum = 0;
-	  
-	  int    
-	    i,
-	    k,
-	    n = processes,
-	    p = numberOfPartitions[s],    
-	    *assignments = (int *)calloc(n, sizeof(int));  
-	  
-	  partitionType 
-	    *pt = (partitionType *)malloc(sizeof(partitionType) * p);
-	  
-	  
-	  for(i = 0, k = 0; i < tr->NumberOfModels; i++)
-	    {
-	      if(tr->partitionData[i].states == modelStates[s])
-		{
-		  pt[k].partitionNumber = i;
-		  pt[k].partitionLength = tr->partitionData[i].upper - tr->partitionData[i].lower;
-		  sum += (size_t)pt[k].partitionLength;
-		  k++;
-		}
-	    }
-	  
-	  assert(k == p);
-	  
-	  qsort(pt, p, sizeof(partitionType), partCompare);    
-	  
-	  for(i = 0; i < p; i++)
-	    {
-	      int 
-		k, 
-		min = INT_MAX,
-		minIndex = -1;
-	      
-	      for(k = 0; k < n; k++)	
-		if(assignments[k] < min)
-		  {
-		    min = assignments[k];
-		    minIndex = k;
-		  }
-	      
-	      assert(minIndex >= 0);
-	      
-	      assignments[minIndex] +=  pt[i].partitionLength;
-	      assert(pt[i].partitionNumber >= 0 && pt[i].partitionNumber < tr->NumberOfModels);
-	      tr->partitionAssignment[pt[i].partitionNumber] = minIndex;
-	    }
-	  
-	  if(tid == 0)
-	    {
-	      for(i = 0; i < n; i++)	       
-		printBothOpen("Process %d has %d sites for %d state model \n", i, assignments[i], modelStates[s]);		  		
-	      
-	      printBothOpen("\n");
-	    }
-
-	  for(i = 0; i < n; i++)
-	    checkSum += (size_t)assignments[i];
-	  
-	  assert(sum == checkSum);
-	  
-	  free(assignments);
-	  free(pt);
-	}
-    }
-
-
- 
+#ifdef _USE_RTS 
+  MPI_Comm_set_errhandler(mpiState.comm, MPI_ERRORS_RETURN);
+  puts("Running with RTS activated"); 
+#endif
+  
+  /* :TODO:necessary?  */
+  MPI_Barrier(mpiState.comm);
 }
 
 
 
-static void initializePartitions(tree *tr, FILE *byteFile)
-{ 
-  size_t
-    i,
-    j,
-    width,
-    model,
-    /* offset, */
-    countOffset,
-    myLength = 0;
-
-  int
-    maxCategories;
-
-  unsigned char 
-    *y;
-
-  compute_bits_in_16bits(tr->bits_in_16bits);
-  
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    tr->partitionData[model].width        = 0;
-
-  if(tr->manyPartitions)
-    {
-      multiprocessorScheduling(tr, processID);  
-      computeFractionMany(tr, processID);
-    }
-  else
-    computeFraction(tr, processID, processes);
-  	   
-  maxCategories = tr->maxCategories;
-
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    {                       
-      const partitionLengths 
-	*pl = getPartitionLengths(&(tr->partitionData[model])); 
-
-      width = tr->partitionData[model].width;
-
-      tr->partitionData[model].wr = (double *)malloc(sizeof(double) * width);
-      tr->partitionData[model].wr2 = (double *)malloc(sizeof(double) * width);     
-
-     	
-      /* 
-	 globalScaler needs to be 2 * tr->mxtips such that scalers of inner AND tip nodes can be added without a case switch
-	 to this end, it must also be initialized with zeros -> calloc
-       */
-
-      tr->partitionData[model].globalScaler    = (unsigned int *)calloc(2 * tr->mxtips, sizeof(unsigned int));  	         
-
-      tr->partitionData[model].left              = (double *)malloc_aligned(pl->leftLength * (maxCategories + 1) * sizeof(double));
-      tr->partitionData[model].right             = (double *)malloc_aligned(pl->rightLength * (maxCategories + 1) * sizeof(double));
-      tr->partitionData[model].EIGN              = (double*)malloc(pl->eignLength * sizeof(double));
-      tr->partitionData[model].EV                = (double*)malloc_aligned(pl->evLength * sizeof(double));
-      tr->partitionData[model].EI                = (double*)malloc(pl->eiLength * sizeof(double));
-      
-      tr->partitionData[model].substRates        = (double *)malloc(pl->substRatesLength * sizeof(double));
-      tr->partitionData[model].frequencies       = (double*)malloc(pl->frequenciesLength * sizeof(double));
-      tr->partitionData[model].empiricalFrequencies       = (double*)malloc(pl->frequenciesLength * sizeof(double));
-      tr->partitionData[model].tipVector         = (double *)malloc_aligned(pl->tipVectorLength * sizeof(double));
-      tr->partitionData[model].symmetryVector    = (int *)malloc(pl->symmetryVectorLength  * sizeof(int));
-      tr->partitionData[model].frequencyGrouping = (int *)malloc(pl->frequencyGroupingLength  * sizeof(int));
-      
-      tr->partitionData[model].perSiteRates      = (double *)malloc(sizeof(double) * tr->maxCategories);
-            
-      tr->partitionData[model].nonGTR = FALSE;            
-
-      tr->partitionData[model].gammaRates = (double*)malloc(sizeof(double) * 4);
-      tr->partitionData[model].yVector = (unsigned char **)malloc(sizeof(unsigned char*) * (tr->mxtips + 1));
-
-      
-      tr->partitionData[model].xVector = (double **)malloc(sizeof(double*) * tr->mxtips);   
-      	
-      for(j = 0; j < (size_t)tr->mxtips; j++)	        	  	  	  	 
-	  tr->partitionData[model].xVector[j]   = (double*)NULL;   
-
-      tr->partitionData[model].xSpaceVector = (size_t *)calloc(tr->mxtips, sizeof(size_t));  
-
-      tr->partitionData[model].sumBuffer = (double *)malloc_aligned(width *
-									   (size_t)(tr->partitionData[model].states) *
-									   discreteRateCategories(tr->rateHetModel) *
-									   sizeof(double));
-	    
-      tr->partitionData[model].wgt = (int *)malloc_aligned(width * sizeof(int));	  
-
-      /* rateCategory must be assigned using calloc() at start up there is only one rate category 0 for all sites */
-      
-      /* :TODO: reduce memory consumption?  */
-      tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(int));
-      /* tr->partitionData[model].rateCategory = (int *)calloc(width, sizeof(unsigned char)); */
-
-      if(width > 0 && tr->saveMemory)
-	{
-	  tr->partitionData[model].gapVectorLength = ((int)width / 32) + 1;
-	    
-	  tr->partitionData[model].gapVector = (unsigned int*)calloc(tr->partitionData[model].gapVectorLength * 2 * tr->mxtips, sizeof(unsigned int));	  	    	  	  
-	    
-	  tr->partitionData[model].gapColumn = (double *)malloc_aligned(((size_t)tr->mxtips) *								      
-									       ((size_t)(tr->partitionData[model].states)) *
-									       discreteRateCategories(tr->rateHetModel) * sizeof(double));
-	}
-      else
-	{
-	   tr->partitionData[model].gapVectorLength = 0;
-	    
-	   tr->partitionData[model].gapVector = (unsigned int*)NULL; 	  	    	   
-	    
-	   tr->partitionData[model].gapColumn = (double*)NULL;	    	    	   
-	}              
-    }
-
-        
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    myLength += tr->partitionData[model].width;         
-   
-  /* assign local memory for storing sequence data */
-
-  tr->y_ptr = (unsigned char *)malloc(myLength * (size_t)(tr->mxtips) * sizeof(unsigned char));
-  assert(tr->y_ptr != NULL);
-   
-  for(i = 0; i < (size_t)tr->mxtips; i++)
-    {
-      for(model = 0,countOffset = 0; model < (size_t)tr->NumberOfModels; model++)
-	{
-	  tr->partitionData[model].yVector[i+1]   = &tr->y_ptr[i * myLength + countOffset];
-	  countOffset +=  tr->partitionData[model].width;
-	}
-      assert(countOffset == myLength);
-    }
-
-  /* figure in data */
-
-  if(tr->manyPartitions)
-    {
-      for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-	{
-	  if(isThisMyPartition(tr, processID, model))
-	    {
-	      width = tr->partitionData[model].upper - tr->partitionData[model].lower;	     
-	      
-	      memcpy(&(tr->partitionData[model].wgt[0]), &(tr->aliaswgt[tr->partitionData[model].lower]), sizeof(int) * width);
-	    }
-	}
-    }
-  else
-    {
-      size_t 	   
-	globalCounter, 
-	r, 
-	localCounter;
-      
-      for(model = 0, globalCounter = 0; model < (size_t)tr->NumberOfModels; model++)
-	{
-	  for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
-	    {
-	      if(r % (size_t)processes == (size_t)processID)
-		{
-		  tr->partitionData[model].wgt[localCounter] = tr->aliaswgt[globalCounter];	      	     		 		  					     
-		  
-		  localCounter++;
-		}
-	      globalCounter++;
-	    }
-	  assert(localCounter == tr->partitionData[model].width);
-	}   
-      assert(globalCounter == tr->originalCrunchedLength);
-    }
-   
-  y = (unsigned char *)malloc(sizeof(unsigned char) * tr->originalCrunchedLength);
-
-  for(i = 1; i <= (size_t)tr->mxtips; i++)
-    {
-      myBinFread(y, sizeof(unsigned char), ((size_t)tr->originalCrunchedLength), byteFile);
-	
-      if(tr->manyPartitions)
-	{
-	  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-	    {
-	      if(isThisMyPartition(tr, processID, model))	  
-		{
-		  memcpy(tr->partitionData[model].yVector[i], &(y[tr->partitionData[model].lower]), sizeof(unsigned char) * tr->partitionData[model].width);					    
-		  assert(tr->partitionData[model].width == tr->partitionData[model].upper - tr->partitionData[model].lower);
-		}
-	      else
-		assert(tr->partitionData[model].width == 0);
-	    }
-	}
-      else
-	{
-	  size_t 	  
-	    globalCounter, 
-	    r, 
-	    localCounter;
-
-	  for(model = 0, globalCounter = 0; model < (size_t)tr->NumberOfModels; model++)
-	    {
-	      for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
-		{
-		  if(r % (size_t)processes == (size_t)processID)
-		    {		      
-		      tr->partitionData[model].yVector[i][localCounter] = y[globalCounter]; 	     
-		      
-		      localCounter++;
-		    }
-		  globalCounter++;
-		}
-	      
-	      assert(localCounter == tr->partitionData[model].width);
-	    }
-
-	  assert(globalCounter == tr->originalCrunchedLength);
-	}
-    }
-
-  free(y);
-    
-  /* initialize gap bit vectors at tips when memory saving option is enabled */
-  
-  if(tr->saveMemory)
-    {
-      for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-	{
-	  int        
-	    undetermined = getUndetermined(tr->partitionData[model].dataType);
-	  	 
-	  width =  tr->partitionData[model].width;
-	    
-	  if(width > 0)
-	    {	   	    	      	    	     
-	      for(j = 1; j <= (size_t)(tr->mxtips); j++)
-		for(i = 0; i < width; i++)
-		  if(tr->partitionData[model].yVector[j][i] == undetermined)
-		    tr->partitionData[model].gapVector[tr->partitionData[model].gapVectorLength * j + i / 32] |= mask32[i % 32];	    
-	    }     
-	}
-    }
-}
 
 
-static void initializeTree(tree *tr, analdef *adef)
-{
-  size_t 
-    i,
-    model;
-  
-  FILE 
-    *byteFile = fopen(byteFileName, "rb");
-
-  double 
-    **empiricalFrequencies;	 
-  
-  myBinFread(&(tr->mxtips),                 sizeof(int), 1, byteFile);
-  myBinFread(&(tr->originalCrunchedLength), sizeof(size_t), 1, byteFile);
-  myBinFread(&(tr->NumberOfModels),         sizeof(int), 1, byteFile);
-  myBinFread(&(tr->gapyness),            sizeof(double), 1, byteFile);
-   
-  empiricalFrequencies = (double **)malloc(sizeof(double *) * tr->NumberOfModels);
-  
-  if(adef->perGeneBranchLengths)
-    tr->numBranches = tr->NumberOfModels;
-  else
-    tr->numBranches = 1;
-  
-  /* If we use the RF-based convergence criterion we will need to allocate some hash tables.
-     let's not worry about this right now, because it is indeed ExaML-specific */
-  
- 
-    
-  tr->aliaswgt                   = (int *)malloc(tr->originalCrunchedLength * sizeof(int));
-  myBinFread(tr->aliaswgt, sizeof(int), tr->originalCrunchedLength, byteFile);	       
-  
-  tr->rateCategory    = (int *)    calloc(tr->originalCrunchedLength, sizeof(int));	  
-  tr->wr              = (double *) malloc(tr->originalCrunchedLength * sizeof(double)); 
-  tr->wr2             = (double *) malloc(tr->originalCrunchedLength * sizeof(double)); 
-  tr->patrat          = (double*)  malloc(tr->originalCrunchedLength * sizeof(double));
-  tr->patratStored    = (double*)  malloc(tr->originalCrunchedLength * sizeof(double)); 
-  tr->lhs             = (double*)  malloc(tr->originalCrunchedLength * sizeof(double)); 
-  
-  tr->executeModel   = (boolean *)malloc(sizeof(boolean) * tr->NumberOfModels);
-  
-  for(i = 0; i < (size_t)tr->NumberOfModels; i++)
-    tr->executeModel[i] = TRUE;
-   
-  setupTree(tr); 
-  
-  if(tr->searchConvergenceCriterion && processID == 0)
-    {                     
-      tr->bitVectors = initBitVector(tr->mxtips, &(tr->vLength));
-      tr->h = initHashTable(tr->mxtips * 4);     
-    }
-  
-  for(i = 1; i <= (size_t)tr->mxtips; i++)
-    {
-      int 
-	len;
-      
-      myBinFread(&len, sizeof(int), 1, byteFile);
-      tr->nameList[i] = (char*)malloc(sizeof(char) * len);
-      myBinFread(tr->nameList[i], sizeof(char), len, byteFile);
-      addword(tr->nameList[i], tr->nameHash, i);        
-    }  
- 
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    {      
-      int 
-	len;
-      
-      pInfo 
-	*p = &(tr->partitionData[model]);	   
-      
-      myBinFread(&(p->states),             sizeof(int), 1, byteFile);
-      myBinFread(&(p->maxTipStates),       sizeof(int), 1, byteFile);
-      myBinFread(&(p->lower),              sizeof(size_t), 1, byteFile);
-      myBinFread(&(p->upper),              sizeof(size_t), 1, byteFile);
-      myBinFread(&(p->width),              sizeof(size_t), 1, byteFile);
-      myBinFread(&(p->dataType),           sizeof(int), 1, byteFile);
-      myBinFread(&(p->protModels),         sizeof(int), 1, byteFile);
-      myBinFread(&(p->autoProtModels),     sizeof(int), 1, byteFile);
-      myBinFread(&(p->protFreqs),          sizeof(int), 1, byteFile);
-      myBinFread(&(p->nonGTR),             sizeof(boolean), 1, byteFile);
-      myBinFread(&(p->numberOfCategories), sizeof(int), 1, byteFile);	 
-      
-      /* later on if adding secondary structure data
-	 
-	 int    *symmetryVector;
-	 int    *frequencyGrouping;
-      */
-      
-      myBinFread(&len, sizeof(int), 1, byteFile);
-      p->partitionName = (char*)malloc(sizeof(char) * len);
-      myBinFread(p->partitionName, sizeof(char), len, byteFile);
-      
-      empiricalFrequencies[model] = (double *)malloc(sizeof(double) * p->states);
-      myBinFread(empiricalFrequencies[model], sizeof(double), p->states, byteFile);	   
-    }     
-  
-  initializePartitions(tr, byteFile);
-
-  fclose(byteFile);
-
-  initModel(tr, empiricalFrequencies); 
- 
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    free(empiricalFrequencies[model]);
-
-  free(empiricalFrequencies);
-}
 
 
 
@@ -2302,23 +1819,6 @@ int realMain(int argc, char *argv[])
 }
 
 
-
-
-void setupMpi(int argc, char *argv[])
-{
-  MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &processID);
-  MPI_Comm_size(comm, &processes);
-
-#ifdef _USE_RTS 
-  MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN);
-#endif
-  
-  /* :TODO: necessary?  */
-  MPI_Barrier(comm);
-}
-
-
 void finalize()
 {
   /* TODO pthread barrier */
@@ -2326,7 +1826,6 @@ void finalize()
   MPI_Barrier(comm);
   MPI_Finalize();
 }
-
 
 int main (int argc, char *argv[])
 { 
@@ -2338,4 +1837,5 @@ int main (int argc, char *argv[])
   finalize(); 
   return err;
 }
+
 

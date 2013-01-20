@@ -1238,7 +1238,7 @@ static void readCheckpoint(tree *tr)
   myfread(tr->tree0, sizeof(char), tr->treeStringLength, f);
   myfread(tr->tree1, sizeof(char), tr->treeStringLength, f);
 
-  if(tr->searchConvergenceCriterion && processID == 0)
+  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     {
       int bCounter = 0;
       
@@ -1341,7 +1341,7 @@ void restart(tree *tr)
 }
 
 int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bestlist *bt, bestlist *bestML)
-{
+{				
   const 
     int MaxFast = 26;
   
@@ -1382,11 +1382,11 @@ int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bes
   assert(Thorough == 0);
 
   while(impr && maxtrav < MaxFast)
-    {	
+    { 
       recallBestTree(bestT, 1, tr);     
       nodeRectifier(tr);            
     
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{
 	  ckp.optimizeRateCategoryInvocations = optimizeRateCategoryInvocations;
 	  
@@ -1524,7 +1524,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   
   /* initialization for the hash table to compute RF distances */
 
-  if(tr->searchConvergenceCriterion && processID == 0)
+  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     treeVectorLength = 1;
      
   /* initialize two lists of size 1 and size 20 that will keep track of the best 
@@ -1697,7 +1697,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
       /* save states of algorithmic/heuristic variables for printing the next checkpoint */
 
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{              
 	  ckp.state = FAST_SPRS;  
 	  ckp.optimizeRateCategoryInvocations = optimizeRateCategoryInvocations;              
@@ -1741,7 +1741,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       /* this is the aforementioned convergence criterion that requires computing the RF,
 	 let's not worry about this right now */
 
-      if(tr->searchConvergenceCriterion && processID == 0)
+      if(tr->searchConvergenceCriterion && mpiState.rank == 0)
 	{
 	  int 
 	    bCounter = 0; 
@@ -1777,7 +1777,12 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	      double 
 		rrf = convergenceCriterion(tr->h, tr->mxtips);
 	      
-	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
+	      int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
+	      if(mpiErr != MPI_SUCCESS)
+		{
+		  puts("not implemented."); 
+		  assert(0); 
+		}
 	      
 	      if(rrf <= 0.01) /* 1% cutoff */
 		{
@@ -1792,12 +1797,17 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	    }
 	}
 
-      if(tr->searchConvergenceCriterion && processID != 0 && fastIterations > 0)
+      if(tr->searchConvergenceCriterion && mpiState.rank != 0 && fastIterations > 0)
 	{
 	  double 
 	    rrf;
 	  
-	  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
+	  int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
+	  if(mpiErr != MPI_SUCCESS)
+	    {
+	      puts("not implemented."); 
+	      assert(0); 
+	    }
 	 
 	  if(rrf <= 0.01) /* 1% cutoff */		   
 	    goto cleanup_fast;	      
@@ -1882,7 +1892,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
      a copy of this book is in my office */
 
-  if(tr->searchConvergenceCriterion && processID == 0)
+  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     {
       cleanupHashTable(tr->h, 0);
       cleanupHashTable(tr->h, 1);
@@ -1968,7 +1978,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
       /* now, we write a checkpoint */
       
-      if(processID == 0)
+      if(mpiState.rank == 0)
 	{              
 	  ckp.state = SLOW_SPRS;  
 	  ckp.optimizeRateCategoryInvocations = optimizeRateCategoryInvocations;              
@@ -2020,7 +2030,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	 
 	  /* once again the convergence criterion */
 
-	  if(tr->searchConvergenceCriterion && processID == 0)
+	  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
 	    {
 	      int 
 		bCounter = 0;	   	
@@ -2055,7 +2065,12 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 		  double 
 		    rrf = convergenceCriterion(tr->h, tr->mxtips);
 		  
-		  MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
+		  int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
+		  if(mpiErr != MPI_SUCCESS)
+		    {
+		      puts("not implemented."); 
+		      assert(0); 
+		    }
 		  
 		  if(rrf <= 0.01) /* 1% cutoff */
 		    {
@@ -2068,12 +2083,17 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 		}
 	    }
 	  
-	  if(tr->searchConvergenceCriterion && processID != 0 && thoroughIterations > 0)
+	  if(tr->searchConvergenceCriterion && mpiState.rank != 0 && thoroughIterations > 0)
 	    {
 	      double 
 		rrf;
 	      
-	      MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, comm);
+	      int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
+	      if(mpiErr != MPI_SUCCESS)
+		{
+		  puts("not implemented."); 
+		  assert(0); 
+		}
 	      
 	      if(rrf <= 0.01) /* 1% cutoff */		   
 		goto cleanup;	      
@@ -2167,7 +2187,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	  /*treeEvaluate(tr, 0.25);*/
 	  printBothOpen("tree %d likelihood %1.80f\n", i, tr->likelihood);
 
-	  if(processID == 0)
+	  if(mpiState.rank == 0)
 	    { 	      		
 	      FILE 
 		*treeFile;
@@ -2196,7 +2216,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
   /* free data structures */
 
-  if(tr->searchConvergenceCriterion && processID == 0)
+  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     {
       freeBitVectors(tr->bitVectors, 2 * tr->mxtips);
       free(tr->bitVectors);
