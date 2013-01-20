@@ -29,15 +29,7 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <unistd.h>
-#endif
 
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
 #include "axml.h"
 
 #include "globalVariables.h"
@@ -117,7 +109,7 @@ static void setRateModel(tree *tr, int model, double rate, int position)
 
 
 
-static linkageList* initLinkageList(int *linkList, tree *tr)
+static linkageList* initLinkageList(int *linkList, const tree* const tr)
 {
   int 
     k,
@@ -160,7 +152,7 @@ static linkageList* initLinkageList(int *linkList, tree *tr)
 }
 
 
-static linkageList* initLinkageListGTR(tree *tr)
+static linkageList* initLinkageListGTR(const tree* const tr)
 {
   int
     i,
@@ -243,7 +235,7 @@ static void freeLinkageList( linkageList* ll)
 
 
 
-static void evaluateChange(tree *tr, int rateNumber, double *value, double *result, boolean* converged, int whichFunction, int numberOfModels, linkageList *ll)
+static void evaluateChange(tree *tr, int rateNumber, double *value, double *result, boolean* converged, int whichFunction, int numberOfModels, const linkageList* const ll)
 { 
   int i, k, pos;
 
@@ -358,7 +350,7 @@ static void evaluateChange(tree *tr, int rateNumber, double *value, double *resu
 
 
 static void brentGeneric(double *ax, double *bx, double *cx, double *fb, double tol, double *xmin, double *result, int numberOfModels, 
-			 int whichFunction, int rateNumber, tree *tr, linkageList *ll, double lim_inf, double lim_sup)
+			 int whichFunction, int rateNumber, tree* tr, const linkageList* const ll, double lim_inf, double lim_sup)
 {
   int iter, i;
   double 
@@ -577,7 +569,7 @@ static void brentGeneric(double *ax, double *bx, double *cx, double *fb, double 
 
 static int brakGeneric(double *param, double *ax, double *bx, double *cx, double *fa, double *fb, 
 		       double *fc, double lim_inf, double lim_sup, 
-		       int numberOfModels, int rateNumber, int whichFunction, tree *tr, linkageList *ll)
+		       int numberOfModels, int rateNumber, int whichFunction, tree* tr, const linkageList* const ll)
 {
   double 
     *ulim = (double *)malloc(sizeof(double) * numberOfModels),
@@ -987,7 +979,7 @@ static void optAlpha(tree *tr, double modelEpsilon, linkageList *ll)
 
 
 
-static void optRates(tree *tr, double modelEpsilon, linkageList *ll, int numberOfModels, int states)
+static void optRates(tree *tr, double modelEpsilon,  const linkageList*  const ll, int numberOfModels, int states)
 {
   int 
     i, 
@@ -1140,7 +1132,7 @@ static boolean AAisGTR(tree *tr)
   return TRUE;
 }
 
-static void optRatesGeneric(tree *tr, double modelEpsilon, linkageList *ll)
+static void optRatesGeneric(tree* tr, double modelEpsilon, linkageList *ll)
 {
   int 
     i,
@@ -1186,6 +1178,7 @@ static void optRatesGeneric(tree *tr, double modelEpsilon, linkageList *ll)
 
    for(i = 0; i < ll->entries; i++)
     {
+      assert(0); 
       switch(tr->partitionData[ll->ld[i].partitionList[0]].dataType)
 	{
 	  /* we only have one type of secondary data models in one analysis */
@@ -1245,6 +1238,7 @@ static void optRatesGeneric(tree *tr, double modelEpsilon, linkageList *ll)
 
   if(AAisGTR(tr))
     {
+      assert(0); 
       for(i = 0; i < ll->entries; i++)
 	{
 	  switch(tr->partitionData[ll->ld[i].partitionList[0]].dataType)
@@ -1280,7 +1274,8 @@ static void optRatesGeneric(tree *tr, double modelEpsilon, linkageList *ll)
   */
 
   if(tr->multiStateModel == GTR_MULTI_STATE)
-    {     
+    { 
+      assert(0); 
       for(i = 0; i < ll->entries; i++)
 	{
 	  switch(tr->partitionData[ll->ld[i].partitionList[0]].dataType)
@@ -2868,7 +2863,7 @@ static void printAAmatrix(tree *tr, double epsilon)
 }
 
 
-static void autoProtein(tree *tr)
+static void autoProtein(tree *tr, int tid)
 {
   int 
     countAutos = 0,
@@ -2878,6 +2873,12 @@ static void autoProtein(tree *tr)
    for(model = 0; model < tr->NumberOfModels; model++)	      
      if(tr->partitionData[model].protModels == AUTO)
        countAutos++;
+
+   if(countAutos > 0)
+     {
+       printf("auto protein not implemented yet in examl\n" );
+       errorExit(-1, tid); 
+     }
   
   if(countAutos > 0)
     {
@@ -2958,8 +2959,7 @@ static void autoProtein(tree *tr)
 }
 
 
-
-void modOpt(tree *tr, double likelihoodEpsilon)
+void modOpt(tree *tr, double likelihoodEpsilon, int tid)
 { 
   int 
     i, 
@@ -2982,17 +2982,21 @@ void modOpt(tree *tr, double likelihoodEpsilon)
   invarList = initLinkageList(unlinked, tr);
   rateList  = initLinkageListGTR(tr);
    
-  tr->start = tr->nodep[1];
+  _NON_LOCAL(tid, tr->start = tr->nodep[1]);
                  
   do
     { 
-      currentLikelihood = tr->likelihood;     
-     
-      optRatesGeneric(tr, modelEpsilon, rateList);
+      currentLikelihood = tr->likelihood;
       
-      evaluateGeneric(tr, tr->start, TRUE);                                       
       
-      autoProtein(tr);
+      double time = gettime();
+      _NON_LOCAL(tid, optRatesGeneric(tr, modelEpsilon, rateList)); 
+      if(tid == 0)
+	printf("[0] optimized rates sequentially, this took %f\n", gettime( )- time );
+
+      evaluateGeneric(tr, tr->start, TRUE); 
+      
+      autoProtein(tr, tid);
 
       treeEvaluate(tr, 0.0625);      
       
@@ -3018,10 +3022,9 @@ void modOpt(tree *tr, double likelihoodEpsilon)
 	  assert(0);
 	} 
        
-      printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood));    
 
-      /* puts("finished one step of optimization");  */
-
+      if(tid == 0 )
+	printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood)); 
     }
   while(fabs(currentLikelihood - tr->likelihood) > likelihoodEpsilon);  
   

@@ -1497,7 +1497,7 @@ int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bes
 
 
 
-void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel) 
+void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel, int tid) 
 {   
   int
     i,
@@ -1576,7 +1576,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   if(!adef->useCheckpoint)
     {
       if(estimateModel)
-	modOpt(tr, 10.0);
+	modOpt(tr, 10.0, tid);
       else
 	treeEvaluate(tr, 2);  
     }
@@ -1620,7 +1620,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
       /* optimize model params more thoroughly or just optimize branch lengths */
       if(estimateModel)
-	modOpt(tr, 5.0);
+	modOpt(tr, 5.0, tid);
       else
 	treeEvaluate(tr, 1);   
     }
@@ -1927,7 +1927,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
      alone */
 
   if(estimateModel)
-    modOpt(tr, 1.0);
+    modOpt(tr, 1.0, tid);
   else
     treeEvaluate(tr, 1.0);
 

@@ -495,9 +495,7 @@ typedef struct
 typedef  struct noderec
 {
   double           z[NUM_BRANCHES];
-#ifdef _BAYESIAN 
-  double           z_tmp[NUM_BRANCHES];
-#endif 
+
   struct noderec  *next;
   struct noderec  *back;
   hashNumberType   hash;
@@ -906,10 +904,7 @@ typedef  struct {
   boolean        compressPatterns;
   double         likelihoodEpsilon;
   boolean        useCheckpoint;
- 
-#ifdef _BAYESIAN 
-  boolean       bayesian;
-#endif
+
 } analdef;
 
 
@@ -944,14 +939,6 @@ typedef struct
 
 /****************************** FUNCTIONS ****************************************************/
 
-#ifdef _BAYESIAN 
-extern void mcmc(tree *tr, analdef *adef);
-#endif
-
-
-/* boolean isThisMyPartition(tree *localTree, int tid, int model); */
-
-
 extern void computePlacementBias(tree *tr, analdef *adef);
 
 extern int lookupWord(char *s, stringHashtable *h);
@@ -984,7 +971,7 @@ extern void getxnode ( nodeptr p );
 extern void hookup ( nodeptr p, nodeptr q, double *z, int numBranches);
 extern void hookupDefault ( nodeptr p, nodeptr q, int numBranches);
 extern boolean whitechar ( int ch );
-extern void errorExit ( int e );
+extern void errorExit ( int e, int tid );
 extern void printResult ( tree *tr, analdef *adef, boolean finalPrint );
 extern void printBootstrapResult ( tree *tr, analdef *adef, boolean finalPrint );
 extern void printBipartitionResult ( tree *tr, analdef *adef, boolean finalPrint );
@@ -1005,7 +992,7 @@ extern void doAllInOne ( tree *tr, analdef *adef );
 extern void classifyML(tree *tr, analdef *adef);
 
 extern void resetBranches ( tree *tr );
-extern void modOpt ( tree *tr, double likelihoodEpsilon);
+extern void modOpt ( tree *tr, double likelihoodEpsilon, int tid);
 
 
 
@@ -1050,7 +1037,7 @@ extern double treeOptimizeRapid ( tree *tr, int mintrav, int maxtrav, analdef *a
 extern boolean testInsertRestoreBIG ( tree *tr, nodeptr p, nodeptr q );
 extern void restoreTreeFast ( tree *tr );
 extern int determineRearrangementSetting ( tree *tr, analdef *adef, bestlist *bestT, bestlist *bt, bestlist *bestML);
-extern void computeBIGRAPID ( tree *tr, analdef *adef, boolean estimateModel);
+extern void computeBIGRAPID ( tree *tr, analdef *adef, boolean estimateModel, int tid);
 extern boolean treeEvaluate ( tree *tr, double smoothFactor );
 extern boolean treeEvaluatePartition ( tree *tr, double smoothFactor, int model );
 
@@ -1228,60 +1215,6 @@ extern void newviewGTRGAMMAPROT_AVX(int tipCase,
 #endif
 
 
-
-
-
-/* THE BELOW IS USELESS!!!  */
-/* thread specific stuff */
-#ifdef _USE_PTHREADS
-/* work tags for parallel regions */
-/* :TODO: reduce   */
-#define THREAD_NEWVIEW                0
-#define THREAD_EVALUATE               1
-#define THREAD_MAKENEWZ               2
-#define THREAD_MAKENEWZ_FIRST         3
-#define THREAD_RATE_CATS              4
-#define THREAD_NEWVIEW_PARSIMONY      5
-#define THREAD_EVALUATE_PARSIMONY     6
-#define THREAD_EVALUATE_VECTOR        7
-#define THREAD_ALLOC_LIKELIHOOD       8
-#define THREAD_COPY_RATE_CATS         9
-#define THREAD_COPY_INVAR             10
-#define THREAD_COPY_INIT_MODEL        11
-#define THREAD_FIX_MODEL_INDICES      12
-#define THREAD_INIT_PARTITION         13
-#define THREAD_OPT_INVAR              14
-#define THREAD_OPT_ALPHA              15
-#define THREAD_OPT_RATE               16
-#define THREAD_RESET_MODEL            17
-#define THREAD_COPY_ALPHA             18
-#define THREAD_COPY_RATES             19
-#define THREAD_CAT_TO_GAMMA           20
-#define THREAD_GAMMA_TO_CAT           21
-#define THREAD_NEWVIEW_MASKED         22
-#define THREAD_COPY_PARAMS            26
-#define THREAD_PARSIMONY_RATCHET            27
-#define THREAD_INIT_EPA                     28
-#define THREAD_GATHER_LIKELIHOOD            29
-#define THREAD_INSERT_CLASSIFY              30
-#define THREAD_INSERT_CLASSIFY_THOROUGH     31
-#define THREAD_GATHER_PARSIMONY             32
-#define THREAD_INSERT_CLASSIFY_THOROUGH_BS  33
-#define THREAD_PARSIMONY_INSERTIONS         34
-#define THREAD_PREPARE_EPA_PARSIMONY        35
-#define THREAD_CLEANUP_EPA_PARSIMONY        36
-#define THREAD_CONTIGUOUS_REPLICATE         37
-#define THREAD_USE_GAPPED                   38
-#define THREAD_PREPARE_BIPS_FOR_PRINT       39
-#define THREAD_MRE_COMPUTE                  40
-#define THREAD_BROADCAST_RATE               41
-#define THREAD_OPTIMIZE_PER_SITE_AA         42
-
-void startPthreads(tree *tr); 
-void masterBarrier(int jobType, tree *tr); 
-#endif
-
-
 /* communication phases  */
 #define NUMBER_OF_PHASES 3 
 #define PHASE_BRANCH_OPT 0 
@@ -1314,7 +1247,8 @@ typedef struct _mpiState
 #ifdef _HYBRID
   int numberOfThreads;   
   volatile char *barrier; 
-  pthread_t *threads; 
+  volatile boolean threadsCanCheckBarrier; 
+  volatile boolean barrierIsCrossed; 
 #endif
 
 } examl_MPI_State; 
@@ -1322,3 +1256,7 @@ typedef struct _mpiState
 
 
 #define IS_THIS_MY_PARTITION(tr,model) (assert(tr->manyPartitions),(tr->partitionAssignment[model] == mpiState.rank))
+
+
+
+#define _NON_LOCAL(tid,x)  if(tid == 0) (x) 

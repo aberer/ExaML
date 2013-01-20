@@ -355,7 +355,6 @@ static double evaluateGTRCAT (int *cptr, int *wptr,
 
 
 /* This is the core function for computing the log likelihood at a branch */
-
 void evaluateIterative(tree *tr)
 {
   /* the branch lengths and node indices of the virtual root branch are always the first one that 
@@ -425,13 +424,13 @@ void evaluateIterative(tree *tr)
 	    partitionLikelihood = 0.0, 	   
 	    *x1_start   = (double*)NULL, 
 	    *x2_start   = (double*)NULL,
-	    *diagptable = (double*)NULL,  
+	    *diagptable = (double*)NULL ,
 	    *x1_gapColumn = (double*)NULL,
-	    *x2_gapColumn = (double*)NULL;
+	    *x2_gapColumn = (double*)NULL ;
 	  	    	 	  
 	  unsigned int
 	    *x1_gap = (unsigned int*)NULL,
-	    *x2_gap = (unsigned int*)NULL;	 
+	    *x2_gap = (unsigned int*)NULL;
 	  
 	  unsigned char 
 	    *tip = (unsigned char*)NULL;	  
@@ -742,7 +741,7 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
     
 
 
-    mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm);       
+    mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
 #ifdef _USE_RTS
     mpiState.commPhase = PHASE_LNL_EVAL; 
     mpiState.generation[PHASE_LNL_EVAL]++; 

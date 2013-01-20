@@ -306,7 +306,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
     }
 }
 
-static void computeFraction(tree *tr, int tid, int n)
+static void computeFraction(tree *tr)
 {
   int
     model;
@@ -320,7 +320,7 @@ static void computeFraction(tree *tr, int tid, int n)
 	width = 0;
 
       for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)
-	if(i % n == (size_t)tid)
+	if(i % mpiState.commSize ==  mpiState.rank )
 	  width++;
 
       tr->partitionData[model].width = width;
@@ -328,7 +328,7 @@ static void computeFraction(tree *tr, int tid, int n)
 }
 
 
-static void computeFractionMany(tree *tr, int tid)
+static void computeFractionMany(tree *tr)
 {
   int
     sites = 0;
@@ -425,10 +425,10 @@ void initializePartitions(tree *tr, FILE *byteFile)
   if(tr->manyPartitions)
     {
       multiprocessorScheduling(tr, mpiState.rank);  
-      computeFractionMany(tr, mpiState.rank);
+      computeFractionMany(tr);
     }
   else
-    computeFraction(tr, mpiState.rank, mpiState.commSize);
+    computeFraction(tr);
   	   
   maxCategories = tr->maxCategories;
 
@@ -536,7 +536,6 @@ void initializePartitions(tree *tr, FILE *byteFile)
     {
       for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	{
-	  /* if(isThisMyPartition(tr, mpiState.rank, model)) */
 	  if(IS_THIS_MY_PARTITION(tr,model))
 	    {
 	      width = tr->partitionData[model].upper - tr->partitionData[model].lower;	     
@@ -579,7 +578,6 @@ void initializePartitions(tree *tr, FILE *byteFile)
 	{
 	  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	    {
-	      /* if(isThisMyPartition(tr, mpiState.rank, model))	   */
 	      if(IS_THIS_MY_PARTITION(tr,model))
 		{
 		  memcpy(tr->partitionData[model].yVector[i], &(y[tr->partitionData[model].lower]), sizeof(unsigned char) * tr->partitionData[model].width);					    
@@ -688,7 +686,7 @@ void initializeTree(tree *tr, analdef *adef)
   for(i = 0; i < (size_t)tr->NumberOfModels; i++)
     tr->executeModel[i] = TRUE;
    
-  setupTree(tr); 
+  setupTree(tr);
   
   if(tr->searchConvergenceCriterion && mpiState.rank == 0)
     {                     
