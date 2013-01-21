@@ -46,8 +46,11 @@
 
 
 #ifdef _HYBRID 
-extern void startPthreads(tree *tr, analdef *adef); 
+extern void startPthreads(int argc, char *argv[]); 
 #endif
+
+#include <pthread.h>
+extern void threadBarrier();
 
 
 #define  INCLUDE_DEFINITION
@@ -72,19 +75,6 @@ void storeValuesInTraversalDescriptor(tree *tr, double *value)
    for(model = 0; model < tr->NumberOfModels; model++)
      tr->td[0].parameterValues[model] = value[model];
 }
-
-
-
-
-/* static void myBinFread(void *ptr, size_t size, size_t nmemb, FILE *byteFile) */
-/* {   */
-/*   size_t */
-/*     bytes_read; */
-  
-/*   bytes_read = fread(ptr, size, nmemb, byteFile); */
-
-/*   assert(bytes_read == nmemb); */
-/* } */
 
 
 void *malloc_aligned(size_t size) 
@@ -121,9 +111,6 @@ void *malloc_aligned(size_t size)
    
   return ptr;
 }
-
-
-
 
 
 
@@ -353,7 +340,7 @@ FILE *myfopen(const char *path, const char *mode)
 	{
 	  if(mpiState.rank == 0)
 	    printf("The file %s you want to open for reading does not exist, exiting ...\n", path);
-	  errorExit(-1);
+	  errorExit(-1,NULL);
 	  return (FILE *)NULL;
 	}
     }
@@ -366,7 +353,7 @@ FILE *myfopen(const char *path, const char *mode)
 	  if(mpiState.rank == 0)
 	    printf("The file %s ExaML wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
 		   path, mode);
-	  errorExit(-1);
+	  errorExit(-1,NULL);
 	  return (FILE *)NULL;
 	}
     }
@@ -792,7 +779,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	if(tr->saveBestTrees < 0)
 	  {
 	    printf("Number of best trees to save must be greater than 0!\n");
-	    errorExit(-1);	 
+	    errorExit(-1, NULL);	 
 	  }
 	break;       
       case 'Q':
@@ -823,11 +810,11 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       
       case 'v':
 	printVersionInfo();
-	errorExit(0);
+	errorExit(0, NULL);
       
       case 'h':
 	printREADME();
-	errorExit(0);     
+	errorExit(0,NULL);     
       case 'c':
 	sscanf(optarg, "%d", &tr->categories);
 	break;     
@@ -850,7 +837,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 		  printf("Error select one of the following algorithms via -f :\n");
 		  printMinusFUsage();
 		}
-	      errorExit(-1);
+	      errorExit(-1,NULL);
 	    }
 	  }
 	break;
@@ -892,13 +879,13 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 		printf("For per site rates (called CAT in previous versions) use: PSR\n");	
 		printf("For GAMMA use: GAMMA\n");		
 	      }
-	    errorExit(-1);
+	    errorExit(-1,NULL);
 	  }
 	else
 	  modelSet = 1;
 	break;     
       default:
-	errorExit(-1);
+	errorExit(-1,NULL);
       }
     }
 
@@ -907,21 +894,21 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
     {
       if(mpiState.rank == 0)
 	printf("\nError, you must specify a binary format data file with the \"-s\" option\n");
-      errorExit(-1);
+      errorExit(-1,NULL);
     }
 
   if(!modelSet)
     {
       if(mpiState.rank == 0)
 	printf("\nError, you must specify a model of rate heterogeneity with the \"-m\" option\n");
-      errorExit(-1);
+      errorExit(-1,NULL);
     }
 
   if(!nameSet)
     {
       if(mpiState.rank == 0)
 	printf("\nError: please specify a name for this run with -n\n");
-      errorExit(-1);
+      errorExit(-1,NULL);
     }
 
   if(!treeSet && !adef->useCheckpoint)
@@ -932,7 +919,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	  printf("or re-start the run from a checkpoint with -R\n");
 	}
       
-      errorExit(-1);
+      errorExit(-1,NULL);
     }
   
    {
@@ -979,21 +966,32 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
    @brief The common exit function. Ensures that pthreads are joined
    and the mpi environment is cleaned up properly. 
 
+   @return proper error code 
+
    @note Do not exit otherwis! 
  */
-void errorExit(int e)
+int errorExit(int e, tree *tr)
 {  
-  /* :TODO: barrier!   */
-
-  if(e == 0 )
-    {
-      MPI_Barrier(mpiState.comm); 
-      MPI_Finalize(); 
+  if(tr == NULL)
+    exit(e); 
+  
+  if(tr->threadId == 0)
+    {  
+      if(e == 0 )
+	{
+	  MPI_Barrier(mpiState.comm); 
+	  MPI_Finalize(); 
+	}
+      else 
+	MPI_Abort(mpiState.comm, e);
     }
   else 
-    MPI_Abort(mpiState.comm, e);
+    pthread_exit(NULL); 
 
   exit(e); 
+
+  /* TODO do this properly */
+  return 0 ; 
 }
 
 
@@ -1029,7 +1027,7 @@ static void makeFileNames(void)
 	}
 
 #ifndef _NOT_PRODUCTIVE
-      errorExit(-1);	
+      errorExit(-1,NULL);	
 #endif
     }
 }
@@ -1372,8 +1370,27 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
    @brief Is wrapped by the main function. Thus, we can have this
    function as an entry point for the pthreads.
  */
-int realMain(tree *tr, analdef *adef, int tid)
-{
+int realMain(int tid, int argc, char *argv[])
+{  
+  tree *tr = calloc(1,sizeof(tree));  
+  analdef *adef = calloc(1,sizeof(analdef)); 
+
+  printf("%d/%d enters realMain.\n", tr->threadId, mpiState.rank); 
+
+  initAdef(adef);
+
+  /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
+  get_args(argc, argv, adef, tr); 
+
+  /* generate the ExaML output file names and store them in strings */  
+  makeFileNames();  
+
+  if(mpiState.rank == 0)  
+    {
+      printModelAndProgramInfo(tr, adef, argc, argv);  
+      printBothOpen("Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
+    }  
+
   printf("This is thread %d of process %d.\n", tid, mpiState.rank);
 
   /* 
@@ -1387,8 +1404,15 @@ int realMain(tree *tr, analdef *adef, int tid)
 #endif     
 
 
-  initializeTree(tr, adef);                               
-                         
+  initializeTree(tr, adef); 
+
+  threadBarrier();
+  
+  printf("%d/%d succeeded.\n", tr->threadId, mpiState.rank); 
+
+  errorExit(1,tr); 
+  
+
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,
      while checkpointing is important and has to be implemented for the library we should not worry about this right now 
@@ -1436,18 +1460,49 @@ int realMain(tree *tr, analdef *adef, int tid)
     }            
       
   /* print some more nonsense into the ExaML_info file */  
-  if(mpiState.rank == 0 && tid == 0)
+  if(ABS_NUM_RANK == 0 )
     finalizeInfoFile(tr, adef);
 
-  return 0; 
+
+  return errorExit(EXIT_SUCCESS,tr); 
 }
+
+
+
+
+#ifdef _HYBRID
+void peekNumberOfThreads(int argc, char *argv[])
+{
+  int
+    bad_opt = FALSE; 
+  char 
+    *optarg,
+    c; 
+
+  while(!bad_opt && ((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:T:w:n:s:vhMSDQa", &optind, &optarg))!=-1))
+    {
+
+    switch(c)
+      {    	
+      case 'T': 
+	sscanf(optarg, "%d", &(mpiState.numberOfThreads));
+	if(mpiState.numberOfThreads < 1)
+	  errorExit(-1,NULL); 
+	break;
+      default: 
+	break;
+      }
+    }
+
+}
+#endif
 
 
 static void examl_initMPI(int argc, char **argv)
 {
   /* :TODO: catch errors in this function  */
 
-  MPI_Init(&argc, &argv);
+  MPI_Init(&argc, &argv);  
   mpiState.comm = MPI_COMM_WORLD;
   MPI_Comm_rank(mpiState.comm, &mpiState.rank);
   MPI_Comm_size(mpiState.comm, &mpiState.commSize);
@@ -1455,6 +1510,10 @@ static void examl_initMPI(int argc, char **argv)
   mpiState.generation[PHASE_BRANCH_OPT] = 0;
   mpiState.generation[PHASE_LNL_EVAL] = 0;
   mpiState.generation[PHASE_RATE_OPT] = 0;
+
+#ifdef _HYBRID
+  peekNumberOfThreads(argc,argv);
+#endif
  
 #ifdef _USE_RTS
   MPI_Comm_set_errhandler(mpiState.comm, MPI_ERRORS_RETURN);
@@ -1470,41 +1529,19 @@ int main(int argc, char *argv[])
 { 
   int
     err; 
-  tree *tr; 
-  analdef *adef; 
 
   examl_initMPI(argc, argv);
 
   masterTime = gettime();         
 
-  /* we need these structures only once per process */
-  tr = (tree*)malloc(sizeof(tree));  
-  adef = (analdef*)malloc(sizeof(analdef)); 
-
-  /* initialize the analysis parameters in struct adef to default values */  
-  initAdef(adef);
-
-  /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
-  get_args(argc, argv, adef, tr); 
-
-  /* generate the ExaML output file names and store them in strings */  
-  makeFileNames();
-    
-  if(mpiState.rank == 0)  
-    {
-      printModelAndProgramInfo(tr, adef, argc, argv);  
-      printBothOpen("Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
-    }  
-
 #ifdef _HYBRID
   if(mpiState.numberOfThreads > 1 )
-    startPthreads(tr, adef);
+    startPthreads(argc, argv);
 #endif
 
-  err = realMain(tr,adef, 0); 
-  errorExit(err);
+  err = realMain(0, argc, argv); 
+  /* errorExit(err, NULL); */
 
-  return 0; 
+  return err; 
 }
-
 

@@ -353,7 +353,7 @@
 
 
 
-typedef  int boolean;
+typedef  unsigned char boolean;
 typedef unsigned int nat; 
 
 
@@ -816,6 +816,10 @@ typedef  struct  {
   int *siteToProcess; 
 #endif
 
+/* #ifdef _HYBRID */
+  int threadId; 
+/* #endif */
+
 } tree;
 
 
@@ -984,7 +988,7 @@ extern void getxnode ( nodeptr p );
 extern void hookup ( nodeptr p, nodeptr q, double *z, int numBranches);
 extern void hookupDefault ( nodeptr p, nodeptr q, int numBranches);
 extern boolean whitechar ( int ch );
-extern void errorExit ( int e );
+extern int errorExit ( int e, tree *tr );
 extern void printResult ( tree *tr, analdef *adef, boolean finalPrint );
 extern void printBootstrapResult ( tree *tr, analdef *adef, boolean finalPrint );
 extern void printBipartitionResult ( tree *tr, analdef *adef, boolean finalPrint );
@@ -1290,12 +1294,12 @@ void masterBarrier(int jobType, tree *tr);
 
 
 
-#ifdef _HYBRID 
+#ifdef _HYBRID
 typedef struct
 {
-  tree *tr;
-  analdef *adef; 
-  int threadNumber;
+  int tid; 
+  int argc; 
+  char **argv; 
 }
 threadData;
 #endif
@@ -1313,12 +1317,19 @@ typedef struct _mpiState
 
 #ifdef _HYBRID
   int numberOfThreads;   
-  volatile char *barrier; 
+  volatile boolean *barrier;
+  volatile boolean  threadsCanCheckBarrier; 
+  volatile boolean barrierIsCrossed; 
   pthread_t *threads; 
 #endif
 
 } examl_MPI_State; 
 #endif
 
-
-#define IS_THIS_MY_PARTITION(tr,model) (assert(tr->manyPartitions),(tr->partitionAssignment[model] == mpiState.rank))
+#ifdef _HYBRID
+#define ABS_ID(tr) ((mpiState.rank  * mpiState.numberOfThreads) + tr->threadId)
+#define ABS_NUM_RANK (mpiState.commSize *  mpiState.numberOfThreads)
+#else 
+#define ABS_ID(tr) (mpiState.rank)
+#define ABS_NUM_RANK (mpiState.commSize)
+#endif

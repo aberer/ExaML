@@ -42,6 +42,8 @@
 
 #include "globalVariables.h"
 
+extern int isThisMyPartition(tree *tr, int model); 
+
 static const double MNBRAK_GOLD =    1.618034;
 static const double MNBRAK_TINY =      1.e-20;
 static const double MNBRAK_GLIMIT =     100.0;
@@ -1592,8 +1594,7 @@ static size_t calcSendBufferSize(tree *tr, int tid)
     model;  
 
   for(model = 0; model < tr->NumberOfModels; model++)
-    /* if(isThisMyPartition(tr, tid, model))       */
-    if(IS_THIS_MY_PARTITION(tr,model))
+    /* if(isThisMyPartition(tr, tid, model)) */    
       length += ((size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower);            
 
   return length;
@@ -1623,8 +1624,7 @@ static void gatherCatsWorker(tree *tr, int tid)
 	start = (size_t)tr->partitionData[model].lower,
 	width = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;
       
-      /* if(isThisMyPartition(tr, tid, model)) */
-      if(IS_THIS_MY_PARTITION(tr,model))
+      if(isThisMyPartition(tr, model))
 	{	 	  	  
 	  memcpy(&catBufSend[offsets],       &tr->rateCategory[start], sizeof(int) * width);
 	  memcpy(&rateBufSend[offsets],      tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories);
@@ -1718,8 +1718,7 @@ static void gatherCatsMaster(tree *tr, int tid, int n)
 	start = (size_t)tr->partitionData[model].lower,
 	width = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;
       
-      /* if(isThisMyPartition(tr, tid, model)) */
-      if(IS_THIS_MY_PARTITION(tr,model))
+      if(isThisMyPartition(tr, model))
 	{		  	  
 	  memcpy(&catBufSend[offsets],       &tr->rateCategory[start], sizeof(int)    * width);
 	  memcpy(&rateBufSend[offsets],      tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories);
@@ -1769,8 +1768,7 @@ static void gatherCatsMaster(tree *tr, int tid, int n)
 	  if(numCAT[k] == 1)
 	    numCats++;
 	
-	/* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	if(IS_THIS_MY_PARTITION(tr,model))
+	if(isThisMyPartition(tr,  model))
 	  assert(tr->partitionData[model].numberOfCategories == numCats);
 
 	tr->partitionData[model].numberOfCategories = numCats;
@@ -1828,8 +1826,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
     {            
       for(model = 0; model < tr->NumberOfModels; model++)
 	{
-	  /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	  if(IS_THIS_MY_PARTITION(tr,model))
+	  if(isThisMyPartition(tr,  model))
 	    {
 	      int 	       
 		lower = tr->partitionData[model].lower,
@@ -1955,8 +1952,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	{
 	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
 	    {
-	      /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-		if(IS_THIS_MY_PARTITION(tr,model))
+	      if(isThisMyPartition(tr, model))
 		{
 		  int 
 		    localCount = 0,
@@ -2000,8 +1996,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
 	  for(model = 0; model < tr->NumberOfModels; model++)
 	    {
-	      /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	      if(IS_THIS_MY_PARTITION(tr,model))
+	      if(isThisMyPartition(tr,  model))
 		{
 		  for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
 		    tr->partitionData[model].perSiteRates[i] *= scaler;
@@ -2010,8 +2005,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
 	  for(model = 0, accRat = 0.0; model < tr->NumberOfModels; model++)
 	    {
-	      if(IS_THIS_MY_PARTITION(tr,model))
-	      /* if(isThisMyPartition(tr, mpiState.rank, model)) */
+	      if(isThisMyPartition(tr, model))
 		{
 		  int 
 		    localCount = 0,
@@ -2056,8 +2050,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	{
 	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
 	    {
-	      /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	      if(IS_THIS_MY_PARTITION(tr,model))
+	      if(isThisMyPartition(tr, model))
 		{
 		  int 
 		    localCount = 0,
@@ -2104,8 +2097,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
       
        for(model = 0; model < tr->NumberOfModels; model++)
 	{
-	  /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	  if(IS_THIS_MY_PARTITION(tr,model))
+	  if(isThisMyPartition(tr,  model))
 	    {
 	      int 
 		localCount = 0,
@@ -2131,8 +2123,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
       for(model = 0; model < tr->NumberOfModels; model++)
 	{  
-	  /* if(isThisMyPartition(tr, mpiState.rank, model))	  	  	  */
-	    if(IS_THIS_MY_PARTITION(tr,model))
+	  if(isThisMyPartition(tr, model))
 	    {
 	      int 
 		localCount,
@@ -2623,8 +2614,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       if(tr->manyPartitions)
 	{
 	  for(model = 0; model < tr->NumberOfModels; model++)      
-	    /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	    if(IS_THIS_MY_PARTITION(tr,model))
+	    if(isThisMyPartition(tr, model))
 	      optRateCatModel(tr, model, lower_spacing, upper_spacing, tr->lhs);
 	}
       else
@@ -2639,8 +2629,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 	    execute;
 	  
 	  if(tr->manyPartitions)
-	    execute = (IS_THIS_MY_PARTITION(tr,model)); 
-	    /* execute = isThisMyPartition(tr, mpiState.rank, model); */
+	    execute = isThisMyPartition(tr, model);
 	  else
 	    execute = (mpiState.rank == 0);
  

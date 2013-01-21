@@ -4,6 +4,14 @@
 
 
 
+int isThisMyPartition(tree *tr, int model)
+{  
+  assert(tr->manyPartitions); 
+  return ( tr->partitionAssignment[model] == ABS_ID(tr) ) ; 
+}
+
+
+
 static unsigned int KISS32(void)
 {
   static unsigned int 
@@ -199,7 +207,7 @@ static int partCompare(const void *p1, const void *p2)
 
 
 
-static void multiprocessorScheduling(tree *tr, int tid)
+static void multiprocessorScheduling(tree *tr)
 {
   int 
     s,
@@ -228,7 +236,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
       assert(exists);
     }
 
-  if(tid == 0)
+  if(ABS_ID(tr) == 0 )
     printBothOpen("\nMulti-processor partition data distribution enabled (-Q option)\n");
 
   for(s = 0; s < arrayLength; s++)
@@ -242,7 +250,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
 	  int    
 	    i,
 	    k,
-	    n = mpiState.commSize,
+	    n = ABS_NUM_RANK,
 	    p = numberOfPartitions[s],    
 	    *assignments = (int *)calloc(n, sizeof(int));  
 	  
@@ -286,8 +294,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
 	      tr->partitionAssignment[pt[i].partitionNumber] = minIndex;
 	    }
 
-	  
-	  if(tid == 0)
+	  if(ABS_ID(tr) == 0)
 	    {
 	      for(i = 0; i < n; i++)	       
 		printBothOpen("Process %d has %d sites for %d state model \n", i, assignments[i], modelStates[s]); 
@@ -306,7 +313,7 @@ static void multiprocessorScheduling(tree *tr, int tid)
     }
 }
 
-static void computeFraction(tree *tr, int tid, int n)
+static void computeFraction(tree *tr)
 {
   int
     model;
@@ -314,21 +321,35 @@ static void computeFraction(tree *tr, int tid, int n)
   size_t 
     i;
 
+  
+  int assigned = 0; 
+  int unassigned = 0; 
   for(model = 0; model < tr->NumberOfModels; model++)
     {
       size_t 
 	width = 0;
 
       for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)
-	if(i % n == (size_t)tid)
-	  width++;
+	{
+	  if(i % ABS_NUM_RANK == ABS_ID(tr))
+	    { 
+	      width++;
+	      assigned++; 
+	    }
+	  else 
+	    {
+	      unassigned++; 
+	    }
+	}
 
       tr->partitionData[model].width = width;
     }
+
+  printf("assigned %d, unassigned %d\n", assigned, unassigned); 
 }
 
 
-static void computeFractionMany(tree *tr, int tid)
+static void computeFractionMany(tree *tr)
 {
   int
     sites = 0;
@@ -340,7 +361,7 @@ static void computeFractionMany(tree *tr, int tid)
 
   for(model = 0; model < tr->NumberOfModels; model++)
     {
-      if(IS_THIS_MY_PARTITION(tr,  model)) 
+      if(isThisMyPartition(tr,model))
 	{	 
 	  tr->partitionData[model].width = tr->partitionData[model].upper - tr->partitionData[model].lower;
 	  sites += tr->partitionData[model].width;
@@ -408,6 +429,8 @@ void initializePartitions(tree *tr, FILE *byteFile)
     width,
     model,
     /* offset, */
+    numRank = ABS_NUM_RANK, 
+    myGlobalRank = ABS_ID(tr),
     countOffset,
     myLength = 0;
 
@@ -424,11 +447,11 @@ void initializePartitions(tree *tr, FILE *byteFile)
 
   if(tr->manyPartitions)
     {
-      multiprocessorScheduling(tr, mpiState.rank);  
-      computeFractionMany(tr, mpiState.rank);
+      multiprocessorScheduling(tr);  
+      computeFractionMany(tr);
     }
   else
-    computeFraction(tr, mpiState.rank, mpiState.commSize);
+    computeFraction(tr);
   	   
   maxCategories = tr->maxCategories;
 
@@ -536,8 +559,7 @@ void initializePartitions(tree *tr, FILE *byteFile)
     {
       for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	{
-	  /* if(isThisMyPartition(tr, mpiState.rank, model)) */
-	  if(IS_THIS_MY_PARTITION(tr,model))
+	  if(isThisMyPartition(tr, model))
 	    {
 	      width = tr->partitionData[model].upper - tr->partitionData[model].lower;	     
 	      
@@ -556,7 +578,7 @@ void initializePartitions(tree *tr, FILE *byteFile)
 	{
 	  for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
 	    {
-	      if(r % (size_t)mpiState.commSize == (size_t)mpiState.rank)
+	      if(r % numRank == myGlobalRank)
 		{
 		  tr->partitionData[model].wgt[localCounter] = tr->aliaswgt[globalCounter];	      	     		 		  					     
 		  
@@ -579,8 +601,7 @@ void initializePartitions(tree *tr, FILE *byteFile)
 	{
 	  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
 	    {
-	      /* if(isThisMyPartition(tr, mpiState.rank, model))	   */
-	      if(IS_THIS_MY_PARTITION(tr,model))
+	      if(isThisMyPartition(tr, model))
 		{
 		  memcpy(tr->partitionData[model].yVector[i], &(y[tr->partitionData[model].lower]), sizeof(unsigned char) * tr->partitionData[model].width);					    
 		  assert(tr->partitionData[model].width == tr->partitionData[model].upper - tr->partitionData[model].lower);
@@ -600,7 +621,7 @@ void initializePartitions(tree *tr, FILE *byteFile)
 	    {
 	      for(localCounter = 0, r = (size_t)tr->partitionData[model].lower;  r < (size_t)tr->partitionData[model].upper; r++)
 		{
-		  if(r % (size_t)mpiState.commSize == (size_t)mpiState.rank)
+		  if(r % numRank ==  myGlobalRank )
 		    {		      
 		      tr->partitionData[model].yVector[i][localCounter] = y[globalCounter]; 	     
 		      
@@ -645,7 +666,7 @@ void initializePartitions(tree *tr, FILE *byteFile)
 
 
 void initializeTree(tree *tr, analdef *adef)
-{
+{ 
   size_t 
     i,
     model;
@@ -690,8 +711,9 @@ void initializeTree(tree *tr, analdef *adef)
    
   setupTree(tr); 
   
+  /* TODO  */
   if(tr->searchConvergenceCriterion && mpiState.rank == 0)
-    {                     
+    { 
       tr->bitVectors = initBitVector(tr->mxtips, &(tr->vLength));
       tr->h = initHashTable(tr->mxtips * 4);     
     }
