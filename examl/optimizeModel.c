@@ -29,15 +29,6 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-/* #ifndef WIN32 */
-/* #include <unistd.h> */
-/* #endif */
-
-/* #include <math.h> */
-/* #include <time.h>  */
-/* #include <stdlib.h> */
-/* #include <ctype.h> */
-/* #include <string.h> */
 #include "axml.h"
 #include "thread.h"
 #include "globalVariables.h"
@@ -1582,11 +1573,12 @@ static size_t calcSendBufferSize(tree *tr, int tid)
     model;  
 
   for(model = 0; model < tr->NumberOfModels; model++)
-    /* if(isThisMyPartition(tr, tid, model)) */    
       length += ((size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower);            
 
   return length;
 }
+
+
 
 static void gatherCatsWorker(tree *tr, int tid)
 {  
@@ -1613,7 +1605,7 @@ static void gatherCatsWorker(tree *tr, int tid)
 	width = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;
       
       if(isThisMyPartition(tr, model))
-	{	 	  	  
+	{ 
 	  memcpy(&catBufSend[offsets],       &tr->rateCategory[start], sizeof(int) * width);
 	  memcpy(&rateBufSend[offsets],      tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories);
 	  memcpy(&patBufSend[offsets],       &tr->patrat[start],       sizeof(double) * width);
@@ -1621,9 +1613,9 @@ static void gatherCatsWorker(tree *tr, int tid)
 	  memcpy(&lhsBufSend[offsets],       &tr->lhs[start],          sizeof(double) * width);
 	  
 	  offsets += width;	  
-	}		 		
+	} 
     }
-    
+  
   int mpiErr = MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    (int*)NULL, (int*)NULL, (int*)NULL, MPI_INT,    0, mpiState.comm);
   mpiErr |= MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
   mpiErr |= MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
@@ -1765,26 +1757,8 @@ static void gatherCatsMaster(tree *tr, int tid, int n)
       }
 
     }
-  
-  /* 
-     {
-    double sum = 0.0;
-    
-    for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-      {        
-	int i;
-	printf("\nModel %d cats %d\n", model, tr->partitionData[model].numberOfCategories);
-	for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)	
-	  {
-	    printf("%d %f %f %f\n", tr->rateCategory[i], tr->patrat[i], tr->patratStored[i], tr->lhs[i]);     
-	    sum += tr->lhs[i];
-	    }	
-      }
-    
-    printf("likelihood: %f\n", sum);
-    }
-  */
-  
+
+
   free(modelOffsets);
   free(countArray);
   free(offsetArray);
@@ -2253,49 +2227,21 @@ static void broadcastRatesFewPartitions(tree *tr, int tid)
   int 
     model;
 
-  /* size_t */
-  /*   n = (size_t)mpiState.commSize; */
-
   size_t n =  (size_t)ABS_NUM_RANK;
   
   HYBRID_BCAST_VAR(tr, patrat, tr->originalCrunchedLength, MPI_DOUBLE, double); 
   HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
-  
-  /* int mpiErr = MPI_Bcast(tr->patrat, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */  
-  /* mpiErr |= MPI_Bcast(tr->patratStored, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
-  /* if(mpiErr != MPI_SUCCESS) */
-  /*   { */
-  /*     puts("not implemented.");  */
-  /*     assert(0);  */
-  /*   } */
 
   for(model = 0; model < tr->NumberOfModels; model++)
     { 
       HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
       HYBRID_BCAST_VAR(tr, partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories,MPI_DOUBLE, double); 
-      /* HYBRID_BCAST_VAR() */
-      /* mpiErr = MPI_Bcast(&(tr->partitionData[model].numberOfCategories), 1, MPI_INT, 0, mpiState.comm); */
-      /* mpiErr |= MPI_Bcast(tr->partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories, MPI_DOUBLE, 0, mpiState.comm);  */
-      /* if(mpiErr != MPI_SUCCESS) */
-      /* 	{ */
-      /* 	  puts("not implemented.");  */
-      /* 	  assert(0);  */
-      /* 	} */
     }
-  /* int mpiErr;  */
 
   HYBRID_BCAST_VAR(tr, rateCategory, tr->originalCrunchedLength, MPI_INT, int); 
   HYBRID_BCAST_VAR(tr, wr, tr->originalCrunchedLength, MPI_DOUBLE, double); 
   HYBRID_BCAST_VAR(tr, wr2, tr->originalCrunchedLength,MPI_DOUBLE, double); 
-  /* mpiErr = MPI_Bcast(tr->rateCategory, tr->originalCrunchedLength, MPI_INT,    0, mpiState.comm); */
-  /* mpiErr |= MPI_Bcast(tr->wr,                 tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
-  /* mpiErr |= MPI_Bcast(tr->wr2,                tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
-  /* if(mpiErr != MPI_SUCCESS) */
-  /*   { */
-  /*     puts("not implemented.");  */
-  /*     assert(0);  */
-  /*   } */
-  
+
   for(model = 0; model < tr->NumberOfModels; model++)
     {
       size_t
@@ -2314,16 +2260,7 @@ static void broadcastRatesFewPartitions(tree *tr, int tid)
 	    }
 	}
     }
- 
-  /* HYBRID_BARRIER(tr->threadId); */
 
-  /* :TODO: needed?  */
-  /* mpiErr = MPI_Barrier(mpiState.comm); */
-  /* if(mpiErr != MPI_SUCCESS) */
-  /*   { */
-  /*     puts("not implemented.");  */
-  /*     assert(0);  */
-  /*   } */
 }
 
 
@@ -2702,28 +2639,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 	}            
 
       updatePerSiteRates(tr, TRUE);	
-     
-      /*
-	if(mpiState.rank == 0)
-	{	  
-	  double sum = 0.0;
-	  int model;
-	  
-	  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-	    {        
-	      int i;
-	      printf("\nModel %d cats %d\n", model, tr->partitionData[model].numberOfCategories);
-	      for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)	
-		{
-		  printf("%d %f %f %f\n", tr->rateCategory[i], tr->patrat[i], tr->patratStored[i], tr->lhs[i]); 
-		  sum += tr->lhs[i];
-		}	
-	    }	
-	  
-	  printf("likelihood: %f\n", sum);
-	}
-      */
-     
+
       evaluateGeneric(tr, tr->start, TRUE);
 
       /* printf("%f \n", tr->likelihood); */
@@ -2754,7 +2670,6 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       free(oldCategorizedRates);
       free(oldCategory);
       free(ratStored);       
-      /*      free(lhs); */
       free(oldNumbers);
     }
 }

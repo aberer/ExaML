@@ -955,21 +955,12 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 
       {
 	int length = 2 * tr->numBranches; 
-	/* double  */
-	/*   *send = (double *)malloc(sizeof(double) * tr->numBranches * 2), */
-	/*   *recv = (double *)malloc(sizeof(double) * tr->numBranches * 2);		 */
-  
-	/* memcpy(&send[0],                dlnLdlz,   sizeof(double) * tr->numBranches); */
-	/* memcpy(&send[tr->numBranches],  d2lnLdlz2, sizeof(double) * tr->numBranches); */
 	
 	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches); 
 	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches); 
 
 	
 	HYBRID_ALLREDUCE_VAR(tr, reductionBuffer,  length, MPI_DOUBLE,double); 
-	/* mpiState.mpiError = MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, mpiState.comm);  */
-
-
 
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 
@@ -981,12 +972,6 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	memcpy(dlnLdlz, tr->reductionBuffer, sizeof(double) * tr->numBranches); 
 	memcpy(d2lnLdlz2, tr->reductionBuffer + tr->numBranches, sizeof(double) * tr->numBranches); 
 
-
-	/* memcpy(dlnLdlz,   &recv[0],               sizeof(double) * tr->numBranches); */
-	/* memcpy(d2lnLdlz2, &recv[tr->numBranches], sizeof(double) * tr->numBranches); */
-
-	/* free(send); */
-	/* free(recv); */
       }
      
       /* do a NR step, if we are on the correct side of the maximum that's okay, otherwise 

@@ -726,13 +726,8 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   evaluateIterative(tr);  
     		
   {
-
-    /* double  */
-    /*   *recv = (double *)malloc(sizeof(double) * tr->NumberOfModels); */
-
     HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double ); 
     
-    /* mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm);        */
 #ifdef _USE_RTS
     assert(0); 
     mpiState.commPhase = PHASE_LNL_EVAL; 
@@ -740,15 +735,11 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
     if(mpiState.mpiError != MPI_SUCCESS)
       handleMPIError(tr); 
 #endif
-    
-    /* memcpy(tr->perPartitionLH, recv, tr->NumberOfModels * sizeof(double)); */
 
     for(model = 0; model < tr->NumberOfModels; model++)        
       result += tr->perPartitionLH[model];
          
-    /* free(recv); */
   }
-
 
   /* set the tree data structure likelihood value to the total likelihood */
 

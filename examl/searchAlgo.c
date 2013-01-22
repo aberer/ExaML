@@ -1767,42 +1767,29 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
 	  if(fastIterations > 0)
 	    {
-	      double 
-		rrf = convergenceCriterion(tr->h, tr->mxtips);
+	      tr->rrf =  convergenceCriterion(tr->h, tr->mxtips);
 	      
-	      int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
-	      if(mpiErr != MPI_SUCCESS)
-		{
-		  puts("not implemented."); 
-		  assert(0); 
-		}
-	      
-	      if(rrf <= 0.01) /* 1% cutoff */
+	      HYBRID_BCAST_VAR_1(tr, rrf, MPI_DOUBLE); 	      
+
+	      if(tr->rrf <= 0.01) /* 1% cutoff */
 		{
 		  printBothOpen(tr,"ML fast search converged at fast SPR cycle %d with stopping criterion\n", fastIterations);
-		  printBothOpen(tr,"Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", rrf, "%");
+		  printBothOpen(tr,"Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", tr->rrf, "%");
 		  cleanupHashTable(tr->h, 0);
 		  cleanupHashTable(tr->h, 1);
 		  goto cleanup_fast;
 		}
 	      else		    
-		printBothOpen(tr,"ML search convergence criterion fast cycle %d->%d Relative Robinson-Foulds %f\n", fastIterations - 1, fastIterations, rrf);
+		printBothOpen(tr,"ML search convergence criterion fast cycle %d->%d Relative Robinson-Foulds %f\n", fastIterations - 1, fastIterations, tr->rrf);
 	    }
 	}
 
-      if(tr->searchConvergenceCriterion && mpiState.rank != 0 && fastIterations > 0)
+      if(tr->searchConvergenceCriterion && ABS_ID(tr) != 0 && fastIterations > 0)
 	{
-	  double 
-	    rrf;
-	  
-	  int mpiErr = MPI_Bcast(&rrf, 1, MPI_DOUBLE, 0, mpiState.comm);
-	  if(mpiErr != MPI_SUCCESS)
-	    {
-	      puts("not implemented."); 
-	      assert(0); 
-	    }
+
+	  HYBRID_BCAST_VAR_1(tr, rrf, MPI_DOUBLE); 
 	 
-	  if(rrf <= 0.01) /* 1% cutoff */		   
+	  if(tr->rrf <= 0.01) /* 1% cutoff */ 
 	    goto cleanup_fast;	      
 	}
 

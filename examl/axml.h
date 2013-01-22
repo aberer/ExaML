@@ -829,6 +829,8 @@ typedef  struct  {
 
   double *reductionBuffer; 
   
+  double rrf; 
+  
 } tree;
 
 

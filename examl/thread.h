@@ -67,6 +67,21 @@ void threadBarrier(int tid);
 
 
 
+
+/* #define HYBRID_GATHERALLV_MASTER(tr,tree_var, length, mpi_type, type) */
+/* { */
+/*   assert(ABS_ID(tr) == 0);  */
+  
+/* } */
+
+
+/* #define HYBRID_GATHERALLV_WORKER(tr, tree_var, length, mpi_type) */
+/* { */
+/* } */
+
+
+
+
 #define HYBRID_BCAST_VAR_1(tr,tree_var,mpi_type)			\
   {									\
    if(tr->threadId ==0)							\

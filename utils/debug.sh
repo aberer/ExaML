@@ -33,9 +33,9 @@ export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
 make clean && make $debugTarget 
 rm -f  *.tmp ; 
 
-
 # FT="-am ft-enable-mpi"
 FT=""
+
 
 sleep 1 
 mpirun $FT -np $num $gdb $exec $args -T $numThread

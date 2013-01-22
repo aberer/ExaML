@@ -1207,105 +1207,96 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
-  if(ABS_ID(tr) == 0)
-    {
-      FILE *logFile;
-      char temporaryFileName[1024] = "";
+  FILE *logFile;
+  char temporaryFileName[1024] = "";
+
+  assert(ABS_ID(tr) == 0); 
       
-      strcpy(temporaryFileName, resultFileName);
+  strcpy(temporaryFileName, resultFileName);
       
-      switch(adef->mode)
-	{    
-	case TREE_EVALUATION:
-	  Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE, finalPrint, SUMMARIZE_LH, FALSE, FALSE);
+  switch(adef->mode)
+    {    
+    case TREE_EVALUATION:
+      Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE, finalPrint, SUMMARIZE_LH, FALSE, FALSE);
 	  
-	  logFile = myfopen(temporaryFileName, "wb");
-	  fprintf(logFile, "%s", tr->tree_string);
-	  fclose(logFile);
+      logFile = myfopen(temporaryFileName, "wb");
+      fprintf(logFile, "%s", tr->tree_string);
+      fclose(logFile);
 	  
-	  if(adef->perGeneBranchLengths)
-	    printTreePerGene(tr, adef, temporaryFileName, "wb");
-	  break;
-	case BIG_RAPID_MODE:     
-	  if(finalPrint)
+      if(adef->perGeneBranchLengths)
+	printTreePerGene(tr, adef, temporaryFileName, "wb");
+      break;
+    case BIG_RAPID_MODE:     
+      if(finalPrint)
+	{
+	  switch(tr->rateHetModel)
 	    {
-	      switch(tr->rateHetModel)
-		{
-		case GAMMA:
-		case GAMMA_I:
-		  Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE, finalPrint,
-			      SUMMARIZE_LH, FALSE, FALSE);
+	    case GAMMA:
+	    case GAMMA_I:
+	      Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE, finalPrint,
+			  SUMMARIZE_LH, FALSE, FALSE);
 		  
-		  logFile = myfopen(temporaryFileName, "wb");
-		  fprintf(logFile, "%s", tr->tree_string);
-		  fclose(logFile);
-		  
-		  if(adef->perGeneBranchLengths)
-		    printTreePerGene(tr, adef, temporaryFileName, "wb");
-		  break;
-		case CAT:
-		  /*Tree2String(tr->tree_string, tr, tr->start->back, FALSE, TRUE, FALSE, FALSE, finalPrint, adef,
-		    NO_BRANCHES, FALSE, FALSE);*/
-		  
-		  
-		  
-		  Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE,
-			      TRUE, SUMMARIZE_LH, FALSE, FALSE);
-		  
-		  
-		  
-		  
-		  logFile = myfopen(temporaryFileName, "wb");
-		  fprintf(logFile, "%s", tr->tree_string);
-		  fclose(logFile);
-		  
-		  break;
-		default:
-		  assert(0);
-		}
-	    }
-	  else
-	    {
-	      Tree2String(tr->tree_string, tr, tr->start->back, FALSE, TRUE, FALSE, FALSE, finalPrint,
-			  NO_BRANCHES, FALSE, FALSE);
 	      logFile = myfopen(temporaryFileName, "wb");
 	      fprintf(logFile, "%s", tr->tree_string);
 	      fclose(logFile);
-	    }    
-	  break;
-	default:
-	  printf("FATAL ERROR call to printResult from undefined STATE %d\n", adef->mode);
-	  exit(-1);
-	  break;
+		  
+	      if(adef->perGeneBranchLengths)
+		printTreePerGene(tr, adef, temporaryFileName, "wb");
+	      break;
+	    case CAT:
+	      /*Tree2String(tr->tree_string, tr, tr->start->back, FALSE, TRUE, FALSE, FALSE, finalPrint, adef,
+		NO_BRANCHES, FALSE, FALSE);*/
+		  
+		  
+		  
+	      Tree2String(tr->tree_string, tr, tr->start->back, TRUE, TRUE, FALSE, FALSE,
+			  TRUE, SUMMARIZE_LH, FALSE, FALSE);
+		  
+		  
+		  
+		  
+	      logFile = myfopen(temporaryFileName, "wb");
+	      fprintf(logFile, "%s", tr->tree_string);
+	      fclose(logFile);
+		  
+	      break;
+	    default:
+	      assert(0);
+	    }
 	}
+      else
+	{
+	  Tree2String(tr->tree_string, tr, tr->start->back, FALSE, TRUE, FALSE, FALSE, finalPrint,
+		      NO_BRANCHES, FALSE, FALSE);
+	  logFile = myfopen(temporaryFileName, "wb");
+	  fprintf(logFile, "%s", tr->tree_string);
+	  fclose(logFile);
+	}    
+      break;
+    default:
+      printf("FATAL ERROR call to printResult from undefined STATE %d\n", adef->mode);
+      exit(-1);
+      break;
     }
 }
 
 
-
-
-
-
-
-
 void printLog(tree *tr)
-{
-  if(ABS_ID(tr) == 0)
-    {
-      FILE *logFile;
-      double t;
+{  
+  FILE *logFile;
+  double t;
+  
+  assert(ABS_ID(tr) == 0); 
       
-      t = gettime() - masterTime;
+  t = gettime() - masterTime;
       
-      logFile = myfopen(logFileName, "ab");
+  logFile = myfopen(logFileName, "ab");
       
-      /* printf("%f %1.40f\n", t, tr->likelihood); */
+  /* printf("%f %1.40f\n", t, tr->likelihood); */
 
-      fprintf(logFile, "%f %f\n", t, tr->likelihood);
+  fprintf(logFile, "%f %f\n", t, tr->likelihood);
       
-      fclose(logFile);
-    }
-	     
+  fclose(logFile);	     
 }
 
 
@@ -1439,19 +1430,14 @@ int realMain(int tid, int argc, char *argv[])
 
   initializeTree(tr, adef); 
 
-/* #ifndef _NOT_PRODUCTIVE */
   if(ABS_ID(tr) == 0)  
     {
       printModelAndProgramInfo(tr, adef, argc, argv);  
       printBothOpen(tr,"Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
     }  
-/* #endif */
 
-#ifdef _HYBRID
   threadBarrier(tid);
   mpiState.allTrees[tr->threadId] = tr; 
-#endif
-
 
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,
@@ -1490,8 +1476,11 @@ int realMain(int tid, int argc, char *argv[])
 	{
 	case TREE_EVALUATION: 	  
 	  modOpt(tr, adef->likelihoodEpsilon);
-	  printLog(tr);
-	  printResult(tr, adef, TRUE); 
+	  if(ABS_ID(tr) == 0)
+	    {
+	      printLog(tr);
+	      printResult(tr, adef, TRUE); 
+	    }
 	  break; 
 	case BIG_RAPID_MODE:
 	  evaluateGeneric(tr, tr->start, TRUE); 
