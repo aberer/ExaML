@@ -1,6 +1,7 @@
 
 #include "axml.h"
 #include "globalVariables.h"
+#include "thread.h"
 
 
 
@@ -55,24 +56,12 @@ boolean setupTree (tree *tr)
   for(i = 0; i < tr->NumberOfModels; i++)
     tr->partitionContributions[i] = -1.0;
   
-  tr->perPartitionLH = (double *)malloc(sizeof(double) * tr->NumberOfModels);
-  
-  
-  for(i = 0; i < tr->NumberOfModels; i++)    
-    tr->perPartitionLH[i] = 0.0;	    
-  
- 
-  
+  tr->perPartitionLH = calloc(tr->NumberOfModels, sizeof(double));
+
   tips  = tr->mxtips;
-  inter = tr->mxtips - 1;
-
- 
- 
+  inter = tr->mxtips - 1; 
   
-  tr->fracchanges  = (double *)malloc(tr->NumberOfModels * sizeof(double));
-  
-
- 
+  tr->fracchanges  = (double *)malloc(tr->NumberOfModels * sizeof(double)); 
 
   tr->treeStringLength = tr->mxtips * (nmlngth+128) + 256 + tr->mxtips * 2;
 
@@ -321,7 +310,6 @@ static void computeFraction(tree *tr)
   size_t 
     i;
 
-  
   int assigned = 0; 
   int unassigned = 0; 
   for(model = 0; model < tr->NumberOfModels; model++)
@@ -664,6 +652,36 @@ void initializePartitions(tree *tr, FILE *byteFile)
 
 
 
+const partitionLengths*  getPartitionLengths(pInfo *p)
+{
+  /* :TODO: this can easily be re-hacked  */
+  /* assert(0);  */
+
+  int
+    dataType  = p->dataType
+    /* ,states    = p->states */
+    /* ,tipLength = p->maxTipStates */
+;
+
+  /* assert(states != -1 && tipLength != -1); */
+
+  /* assert(MIN_MODEL < dataType && dataType < MAX_MODEL); */
+
+  /* pLength.leftLength = pLength.rightLength = states * states; */
+  /* pLength.eignLength = states; */
+  /* pLength.evLength   = states * states; */
+  /* pLength.eiLength   = states * states; */
+  /* pLength.substRatesLength = (states * states - states) / 2; */
+  /* pLength.frequenciesLength = states; */
+  /* pLength.tipVectorLength   = tipLength * states; */
+  /* pLength.symmetryVectorLength = (states * states - states) / 2; */
+  /* pLength.frequencyGroupingLength = states; */
+  /* pLength.nonGTR = FALSE; */
+
+  return (&pLengths[dataType]); 
+}
+
+
 
 void initializeTree(tree *tr, analdef *adef)
 { 
@@ -676,7 +694,7 @@ void initializeTree(tree *tr, analdef *adef)
 
   double 
     **empiricalFrequencies;	 
-  
+
   myBinFread(&(tr->mxtips),                 sizeof(int), 1, byteFile);
   myBinFread(&(tr->originalCrunchedLength), sizeof(size_t), 1, byteFile);
   myBinFread(&(tr->NumberOfModels),         sizeof(int), 1, byteFile);
@@ -710,9 +728,8 @@ void initializeTree(tree *tr, analdef *adef)
     tr->executeModel[i] = TRUE;
    
   setupTree(tr); 
-  
-  /* TODO  */
-  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
+
+  if(tr->searchConvergenceCriterion && ABS_ID(tr) == 0)
     { 
       tr->bitVectors = initBitVector(tr->mxtips, &(tr->vLength));
       tr->h = initHashTable(tr->mxtips * 4);     
@@ -747,8 +764,7 @@ void initializeTree(tree *tr, analdef *adef)
       myBinFread(&(p->autoProtModels),     sizeof(int), 1, byteFile);
       myBinFread(&(p->protFreqs),          sizeof(int), 1, byteFile);
       myBinFread(&(p->nonGTR),             sizeof(boolean), 1, byteFile);
-      myBinFread(&(p->numberOfCategories), sizeof(int), 1, byteFile);	 
-      
+      myBinFread(&(p->numberOfCategories), sizeof(int), 1, byteFile); 
       /* later on if adding secondary structure data
 	 
 	 int    *symmetryVector;
@@ -761,13 +777,16 @@ void initializeTree(tree *tr, analdef *adef)
       
       empiricalFrequencies[model] = (double *)malloc(sizeof(double) * p->states);
       myBinFread(empiricalFrequencies[model], sizeof(double), p->states, byteFile);	   
-    }     
+    }
   
   initializePartitions(tr, byteFile);
 
   fclose(byteFile);
 
+
   initModel(tr, empiricalFrequencies); 
+
+  tr->reductionBuffer = calloc(2 * tr->numBranches, sizeof(double)); 
  
   for(model = 0; model < (size_t)tr->NumberOfModels; model++)
     free(empiricalFrequencies[model]);

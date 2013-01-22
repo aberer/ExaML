@@ -28,15 +28,15 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32 
-#include <unistd.h>
-#endif
+/* #ifndef WIN32  */
+/* #include <unistd.h> */
+/* #endif */
 
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+/* #include <math.h> */
+/* #include <time.h>  */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
 #include "axml.h"
 
 #ifdef __SIM_SSE3

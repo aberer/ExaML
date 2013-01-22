@@ -1,3 +1,10 @@
+
+#include "axml.h"
+#include "globalVariables.h"
+
+
+
+
 #ifdef _HYBRID
 
 /* :TODO: we could migrate to the c11 standard libraries threads at
@@ -10,19 +17,14 @@
 /* #endif */
 
 
-#include "axml.h"
-#include "globalVariables.h"
 
 /* 
    :TODO: stuff I omitted for simplicity 
 
    * Thread to core pinning 
-
 */
 
-/* extern int realMain(tree *tr, analdef *adef, int tid) ; */
 extern int realMain(int tid, int argc, char *argv[]); 
-
 
 static void* realMainThreadWrapper(void *tmp)
 {
@@ -44,27 +46,28 @@ void startPthreads(int argc, char *argv[])
   int rc, t;
   threadData *tData;
 
-  /* jobCycle        = 0; */
-  /* threadJob       = 0; */
-
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-  /* pthread_mutex_init(&mutex , (pthread_mutexattr_t *)NULL); */
-
   mpiState.threads    = (pthread_t *)malloc(mpiState.numberOfThreads * sizeof(pthread_t));
   tData      = (threadData *)malloc(mpiState.numberOfThreads * sizeof(threadData));
+  /* pthread_mutex_init(&mutex , (pthread_mutexattr_t *)NULL); */
   /* reductionBuffer          = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
   /* reductionBufferTwo       = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
   /* reductionBufferThree     = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
   /* reductionBufferParsimony = (volatile int *)malloc(sizeof(volatile int) *  NumberOfThreads); */
 
-  /* mpiState.barrier = malloc(sizeof(volatile char) *  mpiState.numberOfThreads); */
-
-  /* for(t = 0; t < mpiState.numberOfThreads; t++) */
-    /* mpiState.barrier[t] = 0; */
-
   /* branchInfos              = (volatile branchInfo **)malloc(sizeof(volatile branchInfo *) * NumberOfThreads); */
+
+  
+  mpiState.exitCodes = calloc(mpiState.numberOfThreads,sizeof(int));
+
+  mpiState.barrier = calloc(mpiState.numberOfThreads, sizeof(volatile boolean) );
+  for(t = 0; t < mpiState.numberOfThreads; t++)
+    mpiState.barrier[t] = FALSE;
+
+  mpiState.allTrees = calloc(mpiState.numberOfThreads, sizeof(tree*)); 
+  
 
   for(t = 1; t < mpiState.numberOfThreads; t++)
   {
@@ -82,40 +85,46 @@ void startPthreads(int argc, char *argv[])
 }
 
 
-
 void threadBarrier(int tid)
 {
-  int i;
-
-  if(tid == 0)
-    {
-      for(i = 0 ;i < mpiState.numberOfThreads; ++i)
-        mpiState.barrier[i] = FALSE;
-      mpiState.barrierIsCrossed = FALSE;
-      mpiState.threadsCanCheckBarrier = TRUE;
-    }
-  else
-    while(NOT mpiState.threadsCanCheckBarrier);
-
-  mpiState.barrier[tid] = TRUE;
-
-  if(tid == 0)
-    {
-      nat sum;
-      do
-        {
-          sum = 0;
-          for(i = 0; i < mpiState.numberOfThreads; ++i)
-            sum += mpiState.barrier[i];
-        }
-      while(sum < mpiState.numberOfThreads);
-
-      mpiState.threadsCanCheckBarrier = FALSE;
-      mpiState.barrierIsCrossed = TRUE;
-    }
-  else
-    while(NOT mpiState.barrierIsCrossed);
+  pthread_barrier_wait(&(mpiState.pBarrier)); 
 }
+
+
+
+/* void threadBarrier(int tid) */
+/* { */
+/*   int i; */
+
+/*   if(tid == 0) */
+/*     { */
+/*       for(i = 0 ;i < mpiState.numberOfThreads; ++i) */
+/*         mpiState.barrier[i] = FALSE; */
+/*       mpiState.barrierIsCrossed = FALSE; */
+/*       mpiState.threadsCanCheckBarrier = TRUE; */
+/*     } */
+/*   else */
+/*     while(NOT mpiState.threadsCanCheckBarrier); */
+
+/*   mpiState.barrier[tid] = TRUE; */
+
+/*   if(tid == 0) */
+/*     { */
+/*       nat sum; */
+/*       do */
+/*         { */
+/*           sum = 0; */
+/*           for(i = 0; i < mpiState.numberOfThreads; ++i) */
+/*             sum += mpiState.barrier[i]; */
+/*         } */
+/*       while(sum < mpiState.numberOfThreads); */
+
+/*       mpiState.threadsCanCheckBarrier = FALSE; */
+/*       mpiState.barrierIsCrossed = TRUE; */
+/*     } */
+/*   else */
+/*     while(NOT mpiState.barrierIsCrossed); */
+/* } */
 
 
 #else 
@@ -128,7 +137,7 @@ void dummyFunction(int a)
 }
 
 
-void threadBarrier(int tid)
+inline void threadBarrier(int tid)
 {
 }
 #endif

@@ -47,7 +47,7 @@ cppcheck:
 
 
 check-syntax:
-	$(CXX) $(LANG) -Wstrict-overflow -Wall -Wextra -pedantic -fsyntax-only $(INCLUDES) $(CHK_SOURCES) 
+	$(CXX) $(LANG) $(FEATURES) -Wstrict-overflow -Wall -Wextra -pedantic -fsyntax-only $(INCLUDES) $(CHK_SOURCES) 
 
 
 

@@ -1,16 +1,16 @@
-#ifndef WIN32
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h>  
-#endif
+/* #ifndef WIN32 */
+/* #include <sys/times.h> */
+/* #include <sys/types.h> */
+/* #include <sys/time.h> */
+/* #include <unistd.h>   */
+/* #endif */
 
-#include <limits.h>
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+/* #include <limits.h> */
+/* #include <math.h> */
+/* #include <time.h>  */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
 #include "axml.h"
 
 

@@ -27,15 +27,7 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32 
-#include <unistd.h>
-#endif
 
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
 #include "axml.h"
 
 /* the set of functions in here computes the log likelihood at a given branch (the virtual root of a tree) */
@@ -47,6 +39,8 @@
 #include <pmmintrin.h>
 /*#include <tmmintrin.h>*/
 #endif
+
+#include "thread.h"
 
 #include "faultTolerance.h"
 
@@ -65,11 +59,6 @@
    will access those variables simulatenously 
 */
 
-
-extern const char inverseMeaningDNA[16];
-/* extern int processID; */
-
-/* a pre-computed 32-bit integer mask */
 
 /* the function below computes the P matrix from the decomposition of the Q matrix and the respective rate categories for a single partition */
    
@@ -737,25 +726,27 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   evaluateIterative(tr);  
     		
   {
-    double 
-      *recv = (double *)malloc(sizeof(double) * tr->NumberOfModels);
+
+    /* double  */
+    /*   *recv = (double *)malloc(sizeof(double) * tr->NumberOfModels); */
+
+    HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double ); 
     
-
-
-    mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm);       
+    /* mpiState.mpiError = MPI_Allreduce(tr->perPartitionLH, recv, tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm);        */
 #ifdef _USE_RTS
+    assert(0); 
     mpiState.commPhase = PHASE_LNL_EVAL; 
     mpiState.generation[PHASE_LNL_EVAL]++; 
     if(mpiState.mpiError != MPI_SUCCESS)
       handleMPIError(tr); 
 #endif
     
-    memcpy(tr->perPartitionLH, recv, tr->NumberOfModels * sizeof(double));
+    /* memcpy(tr->perPartitionLH, recv, tr->NumberOfModels * sizeof(double)); */
 
     for(model = 0; model < tr->NumberOfModels; model++)        
       result += tr->perPartitionLH[model];
          
-    free(recv);
+    /* free(recv); */
   }
 
 

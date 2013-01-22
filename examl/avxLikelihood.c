@@ -1,14 +1,6 @@
-#include <unistd.h>
 
-#include <math.h>
-#include <time.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
 #include "axml.h"
-#include <stdint.h>
+
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 #include <immintrin.h>

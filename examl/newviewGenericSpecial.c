@@ -27,18 +27,19 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <unistd.h>
-#endif
+/* #ifndef WIN32 */
+/* #include <unistd.h> */
+/* #endif */
 
-#include <math.h>
-#include <time.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
+/* #include <math.h> */
+/* #include <time.h> */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
+/* #include <stdint.h> */
+/* #include <limits.h> */
 #include "axml.h"
+#include "globalVariables.h" 
 
 #ifdef __SIM_SSE3
 
@@ -57,13 +58,6 @@ const union __attribute__ ((aligned (BYTE_ALIGNMENT)))
 
 
 #endif
-
-
-extern int processID;
-
-/* bit mask */
-
-extern const unsigned int mask32[32];
 
 
 /* generic function for computing the P matrices, for computing the conditional likelihood at a node p, given child nodes q and r 
@@ -898,8 +892,9 @@ void newviewIterative (tree *tr, int startIndex)
 	      size_t
 		gapOffset = 0,
 		rateHet = discreteRateCategories(tr->rateHetModel),
-
-		/* get the number of states in the data stored in partition model */
+		
+		/* get the number of states in the data stored in partition model */      
+	      
 
 		states = (size_t)tr->partitionData[model].states,	
 
@@ -1053,7 +1048,7 @@ void newviewIterative (tree *tr, int startIndex)
 		    tr->partitionData[model].EIGN, categories,
 		    left, right, tr->saveMemory, tr->maxCategories, states);
 
-
+	      
 #ifndef _OPTIMIZED_FUNCTIONS
 
 	      /* memory saving not implemented */
@@ -1072,7 +1067,7 @@ void newviewIterative (tree *tr, int startIndex)
 				  x1_start, x2_start, x3_start, tr->partitionData[model].EV, tr->partitionData[model].tipVector,
 				  tipX1, tipX2,
 				  width, left, right, wgt, &scalerIncrement, states, getUndetermined(tr->partitionData[model].dataType) + 1);
-
+	      
 #else
 	      /* dedicated highly optimized functions. Analogously to the functions in evaluateGeneric() 
 		 we also siwtch over the state number */
@@ -1183,8 +1178,7 @@ void newviewIterative (tree *tr, int startIndex)
 		  assert(0);
 		}
 #endif
-	      
-	
+
 	      /* important step, here we essentiallt recursively compute the number of scaling multiplications 
 		 at node p: it's the sum of the number of scaling multiplications already conducted 
 		 for computing nodes q and r plus the scaling multiplications done at node p */
@@ -1200,6 +1194,7 @@ void newviewIterative (tree *tr, int startIndex)
 	    }	
 	}
     }
+  
 }
 
 
@@ -1223,7 +1218,7 @@ void newviewGeneric (tree *tr, nodeptr p, boolean masked)
 
   /* compute the traversal descriptor */
   computeTraversalInfo(p, &(tr->td[0].ti[0]), &(tr->td[0].count), tr->mxtips, tr->numBranches, TRUE);
-
+  
   /* the traversal descriptor has been recomputed -> not sure if it really always changes, something to 
      optimize in the future */
   tr->td[0].traversalHasChanged = TRUE;
@@ -1265,8 +1260,6 @@ void newviewGeneric (tree *tr, nodeptr p, boolean masked)
 
       storeExecuteMaskInTraversalDescriptor(tr);      
       
-
-
       newviewIterative(tr, 0);
 
     }

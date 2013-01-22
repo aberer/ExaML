@@ -28,32 +28,9 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h> 
-#endif
-
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
 
 #include "axml.h"
-
-
-extern char infoFileName[1024];
-extern char tree_file[1024];
-extern char *likelihood_key;
-extern char *ntaxa_key;
-extern char *smoothed_key;
-extern int partCount;
-extern double masterTime;
-
-
-
+#include "globalVariables.h"
 
 
 stringHashtable *initStringHashTable(hashNumberType n)

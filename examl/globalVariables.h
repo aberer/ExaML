@@ -35,11 +35,6 @@
 
 examl_MPI_State mpiState; 
 
-double *globalResult;
-infoList iList;
-
-int Thorough = 0;
-
 checkPointState ckp;
 
 char run_id[128] = "", 
@@ -56,7 +51,7 @@ char run_id[128] = "",
   binaryCheckpointInputName[1024] = "",
   byteFileName[1024] = "";
 
-char *protModels[NUM_PROT_MODELS] = {"DAYHOFF", "DCMUT", "JTT", "MTREV", "WAG", "RTREV", "CPREV", "VT", "BLOSUM62", "MTMAM", "LG", "MTART", "MTZOA", "PMB", 
+const char* const protModels[NUM_PROT_MODELS] = {"DAYHOFF", "DCMUT", "JTT", "MTREV", "WAG", "RTREV", "CPREV", "VT", "BLOSUM62", "MTMAM", "LG", "MTART", "MTZOA", "PMB", 
 				     "HIVB", "HIVW", "JTTDCMUT", "FLU", "AUTO","GTR"};
 
 const char inverseMeaningBINARY[4] = {'_', '0', '1', '-'};
@@ -129,14 +124,8 @@ const char *secondaryModelList[21] = { "S6A (GTR)", "S6B", "S6C", "S6D", "S6E", 
 
 double masterTime;
 double accumulatedTime;
-int partCount = 0;
-int optimizeRateCategoryInvocations = 1;
 
-
-
-
-
-partitionLengths pLengths[MAX_MODEL] = {
+const partitionLengths pLengths[MAX_MODEL] = {
   
   /* BINARY */
   {4,   4,   2,  4,  2, 1, 2,  8, 2, 2, FALSE, 3, inverseMeaningBINARY, 2, FALSE, bitVectorIdentity},
@@ -166,37 +155,35 @@ partitionLengths pLengths[MAX_MODEL] = {
   {4096, 4096, 64, 4096, 4096, 2016, 64, 4160, 64, 2016, FALSE, 64, (char*)NULL, 64, TRUE, (unsigned int*)NULL}
 };
 
-partitionLengths pLength;
-
-     
-
-
-
-
-
-
-#ifdef _HYBRID
-/* volatile int             NumberOfJobs; */
-/* volatile int             jobCycle = 0; */
-/* volatile int             threadJob = 0; */
-/* volatile int             NumberOfThreads; */
-/* volatile double          *reductionBufferTwo; */
-/* volatile double          *reductionBufferThree; */
-/* volatile int             *reductionBufferParsimony; */
-/* volatile char             *barrierBuffer; */
-
-/* volatile branchInfo      **branchInfos; */
-/* pthread_mutex_t          mutex; */
-#endif
+/* partitionLengths pLength; */
 
 
 #else  /* only include declaration    */
+
 extern examl_MPI_State mpiState; 
+
+/* TODO assure only writable by abRank=0 */
+extern checkPointState ckp;
+
+/* TODO what shall we do with that?  */
+/* extern infoList iList; */
+
+extern partitionLengths pLength;
+
 extern char byteFileName[1024];
+extern double masterTime;
+extern double accumulatedTime;
+
+extern char binaryCheckpointName[1024];
+extern char binaryCheckpointInputName[1024];
+extern char workdir[1024];
+extern char run_id[128];
+extern char tree_file[1024];
+
+/* for const globals we do not have to worry about in the hybrid
+   setting */
+extern const partitionLengths pLengths[MAX_MODEL];
 extern const unsigned int mask32[32]; 
-/* extern volatile int             NumberOfThreads; */
-/* extern volatile int             jobCycle; */
-/* extern volatile int             threadJob; */
-/* extern volatile char             *barrierBuffer; */
-/* extern pthread_mutex_t          mutex; */
+extern const char* const protModels[NUM_PROT_MODELS]; 
+extern const unsigned int bitVectorAA[23];
 #endif

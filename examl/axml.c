@@ -31,6 +31,7 @@
 
 #include "axml.h"
 #include "tree.h" 
+#include "thread.h"
 
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #include <xmmintrin.h>
@@ -50,7 +51,6 @@ extern void startPthreads(int argc, char *argv[]);
 #endif
 
 #include <pthread.h>
-extern void threadBarrier();
 
 
 #define  INCLUDE_DEFINITION
@@ -150,9 +150,19 @@ void printBothOpen(const char* format, ... )
 
 
 
+void dontAllowInHybrid()
+{
+#ifdef _HYBRID
+  assert(0); 
+#endif
+}
 
+
+
+/* QUARANTINE: those are problematic, since they work with global variables  */
 boolean getSmoothFreqs(int dataType)
 {
+  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].smoothFrequencies;
@@ -160,6 +170,7 @@ boolean getSmoothFreqs(int dataType)
 
 const unsigned int *getBitVector(int dataType)
 {
+  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].bitVector;
@@ -168,6 +179,7 @@ const unsigned int *getBitVector(int dataType)
 
 int getStates(int dataType)
 {
+  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].states;
@@ -175,6 +187,7 @@ int getStates(int dataType)
 
 int getUndetermined(int dataType)
 {
+  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].undetermined;
@@ -184,40 +197,12 @@ int getUndetermined(int dataType)
 
 char getInverseMeaning(int dataType, unsigned char state)
 {
+  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return  pLengths[dataType].inverseMeaning[state];
 }
-
-partitionLengths *getPartitionLengths(pInfo *p)
-{
-  int 
-    dataType  = p->dataType,
-    states    = p->states,
-    tipLength = p->maxTipStates;
-
-  assert(states != -1 && tipLength != -1);
-
-  assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
-
-  pLength.leftLength = pLength.rightLength = states * states;
-  pLength.eignLength = states;
-  pLength.evLength   = states * states;
-  pLength.eiLength   = states * states;
-  pLength.substRatesLength = (states * states - states) / 2;
-  pLength.frequenciesLength = states;
-  pLength.tipVectorLength   = tipLength * states;
-  pLength.symmetryVectorLength = (states * states - states) / 2;
-  pLength.frequencyGroupingLength = states;
-  pLength.nonGTR = FALSE;
-
-  return (&pLengths[dataType]); 
-}
-
-
-
-
-
+/* END */
 
 
 
@@ -788,7 +773,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       case 's':		 	
 	strcpy(byteFileName, optarg);	 	
 	byteFileSet = TRUE;
-	/*printf("%s \n", byteFileName);*/
+	/* printf("BYTE FILE is %s \n", byteFileName); */
 	break;      
       case 'S':
 	tr->saveMemory = TRUE;
@@ -829,7 +814,10 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	  case 'o':
 	    adef->mode = BIG_RAPID_MODE;
 	    tr->doCutoff = FALSE;
-	    break;	    	  	  	     
+	    break;	    	  
+	  case 'e': 
+	    adef->mode = TREE_EVALUATION; 
+	    break; 
 	  default:
 	    {
 	      if(mpiState.rank == 0)
@@ -968,29 +956,43 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 
    @return proper error code 
 
-   @note Do not exit otherwis! 
+   @note Do not exit otherwise!
  */
 int errorExit(int e, tree *tr)
-{  
+{   
   if(tr == NULL)
     exit(e); 
   
   if(tr->threadId == 0)
     {  
+#ifdef _HYBRID      
+      int i; 
+      for(i = 1; i < mpiState.numberOfThreads; ++i)
+	{
+	  pthread_detach(mpiState.threads[tr->threadId]);
+	  pthread_join(mpiState.threads[i],NULL); 
+	}
+#endif
+      printf("all threads have finished!\n"); 
+
       if(e == 0 )
 	{
-	  MPI_Barrier(mpiState.comm); 
-	  MPI_Finalize(); 
+	  MPI_Barrier(mpiState.comm);
+	  MPI_Finalize();     
 	}
       else 
-	MPI_Abort(mpiState.comm, e);
+	{
+	  MPI_Abort(mpiState.comm, e);
+	}
+       
+      exit(e);
     }
-  else 
-    pthread_exit(NULL); 
+  else    
+    {       
+      printf("thread %d finishes \n", tr->threadId); 
+      pthread_exit(&(mpiState.exitCodes[tr->threadId]));
+    }  
 
-  exit(e); 
-
-  /* TODO do this properly */
   return 0 ; 
 }
 
@@ -1046,6 +1048,7 @@ static void makeFileNames(void)
 /********************PRINTING various INFO **************************************/
 
 
+#ifndef  _NOT_PRODUCTIVE
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
   if(mpiState.rank == 0)
@@ -1187,6 +1190,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       fclose(infoFile);
     }
 }
+#endif
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
@@ -1334,7 +1338,7 @@ void getDataTypeString(tree *tr, int model, char typeOfData[1024])
 
 static void finalizeInfoFile(tree *tr, analdef *adef)
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       double t;
 
@@ -1352,6 +1356,18 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
 	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
 	  printBothOpen("Execution information file written to: %s\n",infoFileName);	
 	  break;
+
+	case TREE_EVALUATION:
+	  printBothOpen("\n\nOverall Time for 1 Inference %f\n", t);
+	  /* printBothOpen("\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime); */
+	  /* printBothOpen("Likelihood   : %f\n", tr->likelihood); */
+	  printf("\n\n"); 
+	  printBothOpen("Final GAMMA  likelihood: %f\n", tr->likelihood);
+	  printBothOpen("\n\n");	  	  
+	  printBothOpen("Final tree written to:                 %s\n", resultFileName);
+	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
+	  printBothOpen("Execution information file written to: %s\n",infoFileName); 
+	  break; 
 	default:
 	  assert(0);
 	}
@@ -1365,6 +1381,15 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
 
 
 
+void makeItUntilHere(tree *tr)
+{
+  printf("SUCCESS %d/%d\n", ABS_ID(tr), ABS_NUM_RANK);
+  fflush(stdout);
+  HYBRID_BARRIER(tr->threadId);
+  errorExit(0,tr);   
+}
+
+
 
 /**
    @brief Is wrapped by the main function. Thus, we can have this
@@ -1375,23 +1400,28 @@ int realMain(int tid, int argc, char *argv[])
   tree *tr = calloc(1,sizeof(tree));  
   analdef *adef = calloc(1,sizeof(analdef)); 
 
-  printf("%d/%d enters realMain.\n", tr->threadId, mpiState.rank); 
-
   initAdef(adef);
 
   /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
   get_args(argc, argv, adef, tr); 
 
+  tr->threadId = tid;
+#ifdef _HYBRID
+  threadBarrier(tid);
+  mpiState.allTrees[tr->threadId] = tr; 
+#endif
+
   /* generate the ExaML output file names and store them in strings */  
   makeFileNames();  
 
-  if(mpiState.rank == 0)  
+#ifndef _NOT_PRODUCTIVE
+  if(ABS_ID(tr) == 0)  
     {
       printModelAndProgramInfo(tr, adef, argc, argv);  
       printBothOpen("Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
     }  
+#endif
 
-  printf("This is thread %d of process %d.\n", tid, mpiState.rank);
 
   /* 
      tell the CPU to ignore exceptions generated by denormalized floating point values.
@@ -1406,22 +1436,20 @@ int realMain(int tid, int argc, char *argv[])
 
   initializeTree(tr, adef); 
 
-  threadBarrier();
-  
-  printf("%d/%d succeeded.\n", tr->threadId, mpiState.rank); 
-
-  errorExit(1,tr); 
-  
-
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,
      while checkpointing is important and has to be implemented for the library we should not worry about this right now 
   */
-  
+
+
   if(adef->useCheckpoint)
     {      
       /* read checkpoint file */
       restart(tr);       	
+
+#ifdef _HYBRID
+      assert(0); 
+#endif
 	
       /* continue tree search where we left it off */
       computeBIGRAPID(tr, adef, TRUE); 
@@ -1432,22 +1460,21 @@ int realMain(int tid, int argc, char *argv[])
 	 when checkpointing and restarts were used */
 
 
-      if(mpiState.rank == 0)
+      if(ABS_ID(tr) == 0)
 	accumulatedTime = 0.0;
 	
       /* get the starting tree: here we just parse the tree passed via the command line 
 	 and do an initial likelihood computation traversal 
 	 which we maybe should skeip, TODO */
-	       	
-      getStartingTree(tr);     
+
+      getStartingTree(tr); 
 
       switch(adef->mode)
 	{
-	case TREE_EVALUATION: 
-	  printf("Likelihood accuracy set to %f\n", adef->likelihoodEpsilon);
+	case TREE_EVALUATION: 	  
 	  modOpt(tr, adef->likelihoodEpsilon);
 	  printLog(tr);
-	  printResult(tr, adef, TRUE);  	    
+	  printResult(tr, adef, TRUE); 
 	  break; 
 	case BIG_RAPID_MODE:
 	  evaluateGeneric(tr, tr->start, TRUE); 
@@ -1460,7 +1487,7 @@ int realMain(int tid, int argc, char *argv[])
     }            
       
   /* print some more nonsense into the ExaML_info file */  
-  if(ABS_NUM_RANK == 0 )
+  if(ABS_ID(tr) == 0 )
     finalizeInfoFile(tr, adef);
 
 
@@ -1513,6 +1540,7 @@ static void examl_initMPI(int argc, char **argv)
 
 #ifdef _HYBRID
   peekNumberOfThreads(argc,argv);
+  pthread_barrier_init(&(mpiState.pBarrier), NULL, mpiState.numberOfThreads);
 #endif
  
 #ifdef _USE_RTS
@@ -1535,7 +1563,7 @@ int main(int argc, char *argv[])
   masterTime = gettime();         
 
 #ifdef _HYBRID
-  if(mpiState.numberOfThreads > 1 )
+  /* if(mpiState.numberOfThreads > 1 ) */
     startPthreads(argc, argv);
 #endif
 

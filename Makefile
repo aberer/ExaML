@@ -10,8 +10,8 @@ SRCDIR:=./examl/
 
 # BEGIN customizable stuff 
 mode:=hybrid
-FEATURES := -D_OPTIMIZED_FUNCTIONS -D_NOT_PRODUCTIVE #  -D_USE_RTS
-WARNING_OFF := -Wno-declaration-after-statement  -Wno-sign-compare -Wno-strict-prototypes -Wno-missing-prototypes -Wno-old-style-definition -Wno-missing-declarations -Wno-unused-parameter
+FEATURES :=  -D_NOT_PRODUCTIVE -D_OPTIMIZED_FUNCTIONS #  -D_USE_RTS 
+WARNING_OFF := -Wno-declaration-after-statement  -Wno-sign-compare -Wno-strict-prototypes -Wno-missing-prototypes -Wno-old-style-definition -Wno-missing-declarations -Wno-unused-parameter -Wno-unused-function -Wno-redundant-decls
 # END 
 
 

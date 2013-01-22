@@ -29,17 +29,17 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <unistd.h>
-#endif
+/* #ifndef WIN32 */
+/* #include <unistd.h> */
+/* #endif */
 
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+/* #include <math.h> */
+/* #include <time.h>  */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
 #include "axml.h"
-
+#include "thread.h"
 #include "globalVariables.h"
 
 extern int isThisMyPartition(tree *tr, int model); 
@@ -49,18 +49,6 @@ static const double MNBRAK_TINY =      1.e-20;
 static const double MNBRAK_GLIMIT =     100.0;
 static const double BRENT_ZEPS  =      1.e-5;
 static const double BRENT_CGOLD =   0.3819660;
-
-extern int optimizeRatesInvocations;
-extern int optimizeRateCategoryInvocations;
-extern int optimizeAlphaInvocations;
-extern int optimizeInvarInvocations;
-extern double masterTime;
-extern char ratesFileName[1024];
-extern char workdir[1024];
-extern char run_id[128];
-extern char lengthFileName[1024];
-extern char lengthFileNameModel[1024];
-extern char *protModels[20];
 
 
 /*********************FUNCTIONS FOOR EXACT MODEL OPTIMIZATION UNDER GTRGAMMA ***************************************/
@@ -1076,7 +1064,7 @@ static void optRates(tree *tr, double modelEpsilon, linkageList *ll, int numberO
 	  assert(_b[k] >= lim_inf && _b[k] <= lim_sup);	  
 	  assert(_c[k] >= lim_inf && _c[k] <= lim_sup);	    
 	}      
-
+      
       brentGeneric(_a, _b, _c, _fb, modelEpsilon, _x, result, numberOfModels, RATE_F, i, tr,  ll, lim_inf, lim_sup);
 	
       for(k = 0; k < numberOfModels; k++)
@@ -2146,6 +2134,8 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
     gatherCatsWorker(tr, mpiState.rank);    
 }
 
+
+
 static void gatherRatesFewPartitions(tree *tr, int tid)
 {
   size_t
@@ -2256,43 +2246,55 @@ static void gatherRatesFewPartitions(tree *tr, int tid)
 }
 
 
+
 /* :TODO: replace master/worker scheme here  */
 static void broadcastRatesFewPartitions(tree *tr, int tid)
 { 
   int 
     model;
+
+  /* size_t */
+  /*   n = (size_t)mpiState.commSize; */
+
+  size_t n =  (size_t)ABS_NUM_RANK;
   
-  size_t
-    n = (size_t)mpiState.commSize;
+  HYBRID_BCAST_VAR(tr, patrat, tr->originalCrunchedLength, MPI_DOUBLE, double); 
+  HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
   
-  int mpiErr = MPI_Bcast(tr->patrat, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Bcast(tr->patratStored, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
-  if(mpiErr != MPI_SUCCESS)
-    {
-      puts("not implemented."); 
-      assert(0); 
-    }
+  /* int mpiErr = MPI_Bcast(tr->patrat, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */  
+  /* mpiErr |= MPI_Bcast(tr->patratStored, tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
+  /* if(mpiErr != MPI_SUCCESS) */
+  /*   { */
+  /*     puts("not implemented.");  */
+  /*     assert(0);  */
+  /*   } */
 
   for(model = 0; model < tr->NumberOfModels; model++)
     { 
-      mpiErr = MPI_Bcast(&(tr->partitionData[model].numberOfCategories), 1, MPI_INT, 0, mpiState.comm);
-      mpiErr |= MPI_Bcast(tr->partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories, MPI_DOUBLE, 0, mpiState.comm);	   
-      if(mpiErr != MPI_SUCCESS)
-	{
-	  puts("not implemented."); 
-	  assert(0); 
-	}
+      HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
+      HYBRID_BCAST_VAR(tr, partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories,MPI_DOUBLE, double); 
+      /* HYBRID_BCAST_VAR() */
+      /* mpiErr = MPI_Bcast(&(tr->partitionData[model].numberOfCategories), 1, MPI_INT, 0, mpiState.comm); */
+      /* mpiErr |= MPI_Bcast(tr->partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories, MPI_DOUBLE, 0, mpiState.comm);  */
+      /* if(mpiErr != MPI_SUCCESS) */
+      /* 	{ */
+      /* 	  puts("not implemented.");  */
+      /* 	  assert(0);  */
+      /* 	} */
     }
+  /* int mpiErr;  */
 
-
-  mpiErr = MPI_Bcast(tr->rateCategory, tr->originalCrunchedLength, MPI_INT,    0, mpiState.comm);
-  mpiErr |= MPI_Bcast(tr->wr,                 tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Bcast(tr->wr2,                tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm);
-  if(mpiErr != MPI_SUCCESS)
-    {
-      puts("not implemented."); 
-      assert(0); 
-    }
+  HYBRID_BCAST_VAR(tr, rateCategory, tr->originalCrunchedLength, MPI_INT, int); 
+  HYBRID_BCAST_VAR(tr, wr, tr->originalCrunchedLength, MPI_DOUBLE, double); 
+  HYBRID_BCAST_VAR(tr, wr2, tr->originalCrunchedLength,MPI_DOUBLE, double); 
+  /* mpiErr = MPI_Bcast(tr->rateCategory, tr->originalCrunchedLength, MPI_INT,    0, mpiState.comm); */
+  /* mpiErr |= MPI_Bcast(tr->wr,                 tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
+  /* mpiErr |= MPI_Bcast(tr->wr2,                tr->originalCrunchedLength, MPI_DOUBLE, 0, mpiState.comm); */
+  /* if(mpiErr != MPI_SUCCESS) */
+  /*   { */
+  /*     puts("not implemented.");  */
+  /*     assert(0);  */
+  /*   } */
   
   for(model = 0; model < tr->NumberOfModels; model++)
     {
@@ -2313,14 +2315,17 @@ static void broadcastRatesFewPartitions(tree *tr, int tid)
 	}
     }
  
+  /* HYBRID_BARRIER(tr->threadId); */
+
   /* :TODO: needed?  */
-  mpiErr = MPI_Barrier(mpiState.comm);
-  if(mpiErr != MPI_SUCCESS)
-    {
-      puts("not implemented."); 
-      assert(0); 
-    }
+  /* mpiErr = MPI_Barrier(mpiState.comm); */
+  /* if(mpiErr != MPI_SUCCESS) */
+  /*   { */
+  /*     puts("not implemented.");  */
+  /*     assert(0);  */
+  /*   } */
 }
+
 
 static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
 {  
@@ -2580,15 +2585,15 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       
       evaluateGeneric(tr, tr->start, TRUE);     
 
-      if(optimizeRateCategoryInvocations == 1)
+      if(tr->optimizeRateCategoryInvocations == 1)
 	{
-	  lower_spacing = 0.5 / ((double)optimizeRateCategoryInvocations);
-	  upper_spacing = 1.0 / ((double)optimizeRateCategoryInvocations);
+	  lower_spacing = 0.5 / ((double)tr->optimizeRateCategoryInvocations);
+	  upper_spacing = 1.0 / ((double)tr->optimizeRateCategoryInvocations);
 	}
       else
 	{
-	  lower_spacing = 0.05 / ((double)optimizeRateCategoryInvocations);
-	  upper_spacing = 0.1 / ((double)optimizeRateCategoryInvocations);
+	  lower_spacing = 0.05 / ((double)tr->optimizeRateCategoryInvocations);
+	  upper_spacing = 0.1 / ((double)tr->optimizeRateCategoryInvocations);
 	}
       
       if(lower_spacing < 0.001)
@@ -2597,7 +2602,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       if(upper_spacing < 0.001)
 	upper_spacing = 0.001;
       
-      optimizeRateCategoryInvocations++;
+      tr->optimizeRateCategoryInvocations++;
 
       memcpy(oldCategory, tr->rateCategory, sizeof(int) * tr->originalCrunchedLength);	     
       memcpy(ratStored,   tr->patratStored, sizeof(double) * tr->originalCrunchedLength);
@@ -2978,18 +2983,18 @@ void modOpt(tree *tr, double likelihoodEpsilon)
       currentLikelihood = tr->likelihood;     
      
       optRatesGeneric(tr, modelEpsilon, rateList);
-      
-      evaluateGeneric(tr, tr->start, TRUE);                                       
-      
+
+      evaluateGeneric(tr, tr->start, TRUE); 
+
       autoProtein(tr);
 
-      treeEvaluate(tr, 0.0625);      
-      
+      treeEvaluate(tr, 0.0625); 
+
       switch(tr->rateHetModel)
 	{
 	case GAMMA:      
 	  optAlpha(tr, modelEpsilon, alphaList); 
-	  
+
 	  evaluateGeneric(tr, tr->start, TRUE); 	 	 
 	  
 	  treeEvaluate(tr, 0.1);	  	 
@@ -2998,8 +3003,7 @@ void modOpt(tree *tr, double likelihoodEpsilon)
 	case CAT:
 	  if(catOpt < 3)
 	    {	      	     	     
-	     
-	      optimizeRateCategories(tr, tr->categories);	      	     	      	      	     
+	      optimizeRateCategories(tr, tr->categories); 
 	      catOpt++;
 	    }
 	  break;	  
@@ -3010,6 +3014,8 @@ void modOpt(tree *tr, double likelihoodEpsilon)
       printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood));    
 
       /* puts("finished one step of optimization");  */
+      if(ABS_ID(tr) == 0)
+	printf("did one round of opt\n"); 
 
     }
   while(fabs(currentLikelihood - tr->likelihood) > likelihoodEpsilon);  

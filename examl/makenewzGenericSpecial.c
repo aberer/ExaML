@@ -29,18 +29,18 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <unistd.h>
-#endif
+/* #ifndef WIN32 */
+/* #include <unistd.h> */
+/* #endif */
 
 #include "faultTolerance.h"
 
 
-#include <math.h>
-#include <time.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+/* #include <math.h> */
+/* #include <time.h> */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
 #include "axml.h"
 
 #ifdef __SIM_SSE3
@@ -53,6 +53,7 @@
    of the likelihood in Pthreads and MPI */
 
 #include "globalVariables.h"
+#include "thread.h"
 
 
 /*******************/
@@ -858,6 +859,10 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
   boolean loopConverged;
 
 
+  /* puts("\n\nDANGER entering top-levl- makenewz\n");  */
+  
+
+
   /* figure out if this is on a per partition basis or jointly across all partitions */
   
 
@@ -949,15 +954,23 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
       execCore(tr, dlnLdlz, d2lnLdlz2);
 
       {
-	double 
-	  *send = (double *)malloc(sizeof(double) * tr->numBranches * 2),
-	  *recv = (double *)malloc(sizeof(double) * tr->numBranches * 2);		
+	int length = 2 * tr->numBranches; 
+	/* double  */
+	/*   *send = (double *)malloc(sizeof(double) * tr->numBranches * 2), */
+	/*   *recv = (double *)malloc(sizeof(double) * tr->numBranches * 2);		 */
   
-	memcpy(&send[0],                dlnLdlz,   sizeof(double) * tr->numBranches);
-	memcpy(&send[tr->numBranches],  d2lnLdlz2, sizeof(double) * tr->numBranches);
+	/* memcpy(&send[0],                dlnLdlz,   sizeof(double) * tr->numBranches); */
+	/* memcpy(&send[tr->numBranches],  d2lnLdlz2, sizeof(double) * tr->numBranches); */
 	
+	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches); 
+	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches); 
 
-	mpiState.mpiError = MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
+	
+	HYBRID_ALLREDUCE_VAR(tr, reductionBuffer,  length, MPI_DOUBLE,double); 
+	/* mpiState.mpiError = MPI_Allreduce(send, recv, tr->numBranches * 2, MPI_DOUBLE, MPI_SUM, mpiState.comm);  */
+
+
+
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 
 	mpiState.commPhase = PHASE_BRANCH_OPT; 	
@@ -965,13 +978,15 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	    handleMPIError(tr); 
 #endif
 
+	memcpy(dlnLdlz, tr->reductionBuffer, sizeof(double) * tr->numBranches); 
+	memcpy(d2lnLdlz2, tr->reductionBuffer + tr->numBranches, sizeof(double) * tr->numBranches); 
 
 
-	memcpy(dlnLdlz,   &recv[0],               sizeof(double) * tr->numBranches);
-	memcpy(d2lnLdlz2, &recv[tr->numBranches], sizeof(double) * tr->numBranches);
+	/* memcpy(dlnLdlz,   &recv[0],               sizeof(double) * tr->numBranches); */
+	/* memcpy(d2lnLdlz2, &recv[tr->numBranches], sizeof(double) * tr->numBranches); */
 
-	free(send);
-	free(recv);
+	/* free(send); */
+	/* free(recv); */
       }
      
       /* do a NR step, if we are on the correct side of the maximum that's okay, otherwise 
@@ -1052,6 +1067,7 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 
 void makenewzGeneric(tree *tr, nodeptr p, nodeptr q, double *z0, int maxiter, double *result, boolean mask)
 {
+
   int i;
 
   /* the first entry of the traversal descriptor stores the node pair that defines 

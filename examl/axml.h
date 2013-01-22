@@ -353,7 +353,8 @@
 
 
 
-typedef  unsigned char boolean;
+/* dont mess around with this, binary files will get incompatible */
+typedef  int boolean;
 typedef unsigned int nat; 
 
 
@@ -820,6 +821,14 @@ typedef  struct  {
   int threadId; 
 /* #endif */
 
+
+  /* more global variables */
+  int Thorough; 
+  int optimizeRateCategoryInvocations;
+  infoList iList; 
+
+  double *reductionBuffer; 
+  
 } tree;
 
 
@@ -910,10 +919,6 @@ typedef  struct {
   boolean        compressPatterns;
   double         likelihoodEpsilon;
   boolean        useCheckpoint;
- 
-#ifdef _BAYESIAN 
-  boolean       bayesian;
-#endif
 } analdef;
 
 
@@ -948,14 +953,6 @@ typedef struct
 
 /****************************** FUNCTIONS ****************************************************/
 
-#ifdef _BAYESIAN 
-extern void mcmc(tree *tr, analdef *adef);
-#endif
-
-
-/* boolean isThisMyPartition(tree *localTree, int tid, int model); */
-
-
 extern void computePlacementBias(tree *tr, analdef *adef);
 
 extern int lookupWord(char *s, stringHashtable *h);
@@ -974,8 +971,7 @@ extern unsigned int precomputed16_bitcount(unsigned int n, char *bits_in_16bits)
 
 extern size_t discreteRateCategories(int rateHetModel);
 
-extern partitionLengths * getPartitionLengths(pInfo *p);
-extern boolean getSmoothFreqs(int dataType);
+extern const partitionLengths * getPartitionLengths(pInfo *p);
 extern const unsigned int *getBitVector(int dataType);
 extern int getUndetermined(int dataType);
 extern int getStates(int dataType);
@@ -1037,9 +1033,6 @@ extern boolean smooth ( tree *tr, nodeptr p );
 extern boolean smoothTree ( tree *tr, int maxtimes );
 extern boolean localSmooth ( tree *tr, nodeptr p, int maxtimes );
 extern boolean localSmoothMulti(tree *tr, nodeptr p, int maxtimes, int model);
-extern void initInfoList ( int n );
-extern void freeInfoList ( void );
-extern void insertInfoList ( nodeptr node, double likelihood );
 extern boolean smoothRegion ( tree *tr, nodeptr p, int region );
 extern boolean regionalSmooth ( tree *tr, nodeptr p, int maxtimes, int region );
 extern nodeptr removeNodeBIG ( tree *tr, nodeptr p, int numBranches);
@@ -1314,22 +1307,25 @@ typedef struct _mpiState
   int mpiError;
   int generation[NUMBER_OF_PHASES];
   int commPhase; 
+  int *exitCodes; 
 
 #ifdef _HYBRID
   int numberOfThreads;   
   volatile boolean *barrier;
-  volatile boolean  threadsCanCheckBarrier; 
+  volatile boolean threadsCanCheckBarrier; 
   volatile boolean barrierIsCrossed; 
   pthread_t *threads; 
+  tree **allTrees; 
+  pthread_barrier_t pBarrier; 
 #endif
+
+  
 
 } examl_MPI_State; 
 #endif
 
-#ifdef _HYBRID
-#define ABS_ID(tr) ((mpiState.rank  * mpiState.numberOfThreads) + tr->threadId)
-#define ABS_NUM_RANK (mpiState.commSize *  mpiState.numberOfThreads)
-#else 
-#define ABS_ID(tr) (mpiState.rank)
-#define ABS_NUM_RANK (mpiState.commSize)
-#endif
+
+/* extern void threadBarrier(int tid); */
+
+
+extern void makeItUntilHere(tree *tr); 

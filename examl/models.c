@@ -29,48 +29,22 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-#ifndef WIN32
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h> 
-#endif
+/* #ifndef WIN32 */
+/* #include <sys/times.h> */
+/* #include <sys/types.h> */
+/* #include <sys/time.h> */
+/* #include <unistd.h>  */
+/* #endif */
 
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+/* #include <math.h> */
+/* #include <time.h>  */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
 
 #include "axml.h"
 
-extern int optimizeRatesInvocations;
-extern int optimizeRateCategoryInvocations;
-extern int optimizeAlphaInvocations;
-extern int optimizeTTRatioInvocations;
-extern int optimizeInvarInvocations;
-
-extern const unsigned int bitVectorSecondary[256];
-extern const unsigned int bitVector32[33];
-extern const unsigned int bitVectorAA[23];
-extern const unsigned int bitVectorIdentity[256];
-
-extern const partitionLengths pLengths[MAX_MODEL];
-
-
-
-
-
-extern FILE *byteFile;
-
-
-
-
-
-
-
-
-
+#include "globalVariables.h"
 
 
 void putWAG(double *ext_initialRates)
@@ -3800,7 +3774,7 @@ void initModel(tree *tr, double **empiricalFrequencies)
   
   double  temp;  
      
-  optimizeRateCategoryInvocations = 1;      
+  tr->optimizeRateCategoryInvocations = 1; 
   tr->numberOfInvariableColumns = 0;
   tr->weightOfInvariableColumns = 0;	       
   
@@ -3816,8 +3790,8 @@ void initModel(tree *tr, double **empiricalFrequencies)
       tr->partitionData[model].numberOfCategories = 1;           
       tr->partitionData[model].perSiteRates[0] = 1.0; 
     }
-  
-  /* TODO */
+
+
   if(tr->rateHetModel == CAT)
     updatePerSiteRates(tr, FALSE);
  

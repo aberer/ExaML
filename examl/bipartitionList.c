@@ -34,27 +34,24 @@
  */
 
 
-#ifndef WIN32  
-#include <sys/times.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <unistd.h>  
-#endif
+/* #ifndef WIN32   */
+/* #include <sys/times.h> */
+/* #include <sys/types.h> */
+/* #include <sys/time.h> */
+/* #include <unistd.h>   */
+/* #endif */
 
-#include <limits.h>
-#include <math.h>
-#include <time.h> 
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdint.h>
+/* #include <limits.h> */
+/* #include <math.h> */
+/* #include <time.h>  */
+/* #include <stdlib.h> */
+/* #include <ctype.h> */
+/* #include <string.h> */
+/* #include <stdint.h> */
 #include "axml.h"
 
 #include "globalVariables.h"
 
-
-/* extern const unsigned int mask32[32]; */
-/* extern int processID; */
 
 static void getxnodeBips (nodeptr p)
 {
