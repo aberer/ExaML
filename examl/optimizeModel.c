@@ -2110,114 +2110,262 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 
 
 
-static void gatherRatesFewPartitions(tree *tr, int tid)
+int getNumSitesForHybridCyclic(tree *tr, int absRank)
 {
   size_t
-    n = (size_t)mpiState.commSize;
+    n = ABS_NUM_RANK; 
 
-  if(tid == 0)
+  int
+    cnt = 0,
+    i,
+    model = 0; 
+
+  for(model = 0, cnt = 0; model < tr->NumberOfModels; ++model)
     {
-      int 
-	model;
+      for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; ++i)
+	if(i %  n == absRank)
+	  ++cnt; 
+    }
+  return cnt; 
+}
 
-      size_t
-	localCounter,
-	i,         
-	sendBufferSize = (tr->originalCrunchedLength / n) + 1,
-	recvBufferSize = sendBufferSize * n;
 
-        double 	  	
-          *patBufSend = (double *)malloc(sendBufferSize * sizeof(double)),
-          *patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)),
-          *lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double)),
-          *patBufRecv = (double *)malloc(recvBufferSize * sizeof(double)),
-          *patStoredBufRecv =  (double *)malloc(recvBufferSize * sizeof(double)),
-          *lhsBufRecv = (double *)malloc(recvBufferSize * sizeof(double));                
 
-        for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++)
-	  {               	      	     
-	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++)
-	      if(i % n == (size_t)tid)
-		{
-		  patBufSend[localCounter] = tr->patrat[i];
-		  patStoredBufSend[localCounter] = tr->patratStored[i];
-		  lhsBufSend[localCounter] = tr->lhs[i];
-		  localCounter++;
-		}	    
-	  }
-
-        int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
-        mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
-        mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);	
-	if(mpiErr != MPI_SUCCESS)
+int fillBufferCyclic(tree *tr, double *buf, int absRank, double *valueToExtract )
+{
+  size_t 
+    n = ABS_NUM_RANK; 
+  double
+    *bufPtr = buf; 
+  
+  int cnt = 0,
+    i,
+    model = 0; 
+  
+  for(model = 0, cnt = 0; model < tr->NumberOfModels; ++model)
+    {
+      for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; ++i)
+	if(i % n  == absRank)
 	  {
-	    puts("not implemented."); 
-	    assert(0); 
+	    *bufPtr = valueToExtract[i]; 
+	    bufPtr++;  
+	    cnt++; 
 	  }
+    }
 
-        for(model = 0; model < tr->NumberOfModels; model++)
-	  {   	      
-	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++)
-	      {
-		int 
-		  offset = i % n,
-		  position = i / n;
-		
-		tr->patrat[i]       = patBufRecv[offset * sendBufferSize + position];
-		tr->patratStored[i] = patStoredBufRecv[offset * sendBufferSize + position];
-		tr->lhs[i]                = lhsBufRecv[offset * sendBufferSize + position];		     
-	      }	   	   
-	  }
+  return cnt; 
+}
 
-        free(patBufSend);
-        free(patStoredBufSend);
-        free(lhsBufSend);
-        free(patBufRecv);
-        free(patStoredBufRecv);
-        free(lhsBufRecv);
+
+static void gatherRatesFewPartitionsHelper(tree *tr, double *srcTargetPtr)
+{  
+  int    
+    n = ABS_NUM_RANK, 
+    i = 0,  
+    *offsetsPerRank= NULL, 
+    *numberPerRank = NULL; 
+
+  if(tr->threadId == 0)
+    {
+      /* master needs to know all the offsets */
+      if(ABS_ID(tr) == 0)
+	{
+	  int
+	    numSoFar = 0; 
+
+	  offsetsPerRank = calloc(mpiState.commSize ,sizeof(int));
+	  numberPerRank = calloc(mpiState.commSize, sizeof(int)); 
+      
+	  for(i = 0; i < n; ++i)
+	    {
+	      numberPerRank[i] = getNumSitesForHybridCyclic(tr, i); 
+	      offsetsPerRank[i] = numSoFar; 
+	      numSoFar += numberPerRank[i]; 
+	    }
+	}
+
+      int sendCnt = 0; 
+
+      for(i = 0; i < mpiState.numberOfThreads; ++i)	
+	sendCnt += getNumSitesForHybridCyclic(tr, mpiState.rank * mpiState.numberOfThreads + i); 
+      
+      tr->sendBuf = calloc(sendCnt,sizeof(double)); 
+      threadBarrier(tr->threadId) ; 
+      
+      double *buf = mpiState.allTrees[0]->sendBuf; 
+      fillBufferCyclic(tr, buf, ABS_ID(tr), srcTargetPtr); 
+      threadBarrier(tr->threadId);
+
+      if(ABS_ID(tr) == 0) 	
+	tr->recvBuf = calloc(tr->originalCrunchedLength,sizeof(double)); 
+
+      MPI_Gatherv(buf, sendCnt, MPI_DOUBLE, tr->recvBuf, numberPerRank, offsetsPerRank, MPI_DOUBLE, 0, mpiState.comm);
+      
+      threadBarrier(tr->threadId);
+
+      /* master needs to sort the values back correctly  */
+      if(ABS_ID(tr) == 0)
+	{
+	  int j,
+	    cnt = 0; 
+	  double *srcPtr = tr->recvBuf; 
+
+	  for(i = 0 ; i < n; ++i)
+	    {
+	      int howMany =  getNumSitesForHybridCyclic(tr, i); 
+	      for(j = 0; j < howMany; ++j)
+		{
+		  srcTargetPtr[ j * n + i  ]  = *srcPtr; 
+		  srcPtr++; 
+		  cnt++; 
+		}
+	    }
+	  
+	  assert(cnt == tr->originalCrunchedLength); 
+
+	  free(offsetsPerRank); 
+	  free(numberPerRank); 
+	}
     }
   else
     {
-      int 
-	model;
+      int myOffset =  0; 
+      for(i = 0; i < tr->threadId; ++i)
+	myOffset += getNumSitesForHybridCyclic(tr, mpiState.rank * mpiState.numberOfThreads + i); 
       
-      size_t
-	i,
-	localCounter,
-	sendBufferSize = (tr->originalCrunchedLength / n) + 1;
+      threadBarrier(tr->threadId); 
+
+      double
+	*buf =  mpiState.allTrees[0]->sendBuf + myOffset; 
       
-      double 
-	*localDummy = (double*)NULL,	      
-	*patBufSend = (double *)malloc(sendBufferSize * sizeof(double)),
-	*patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)),
-	*lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double));
-      
-      for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++)
-	{               		  		  
-	  for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)
-	    if(i % n == (size_t)tid)
-	      {
-		patBufSend[localCounter] = tr->patrat[i];
-		patStoredBufSend[localCounter] = tr->patratStored[i];
-		lhsBufSend[localCounter] = tr->lhs[i];
-		localCounter++;
-	      }		  
-	}
-      
-      int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
-      mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
-      mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm);
-      if(mpiErr != MPI_SUCCESS)
-	{
-	  puts("not implemented."); 
-	  assert(0); 
-	}
-      
-      free(patBufSend);
-      free(patStoredBufSend);
-      free(lhsBufSend);
-    }
+      fillBufferCyclic(tr, buf, ABS_ID(tr), srcTargetPtr); 
+
+      threadBarrier(tr->threadId);      
+
+      threadBarrier(tr->threadId);
+    } 
 }
+
+
+/* TODO does this work???  */
+static void gatherRatesFewPartitions(tree *tr)
+{
+  gatherRatesFewPartitionsHelper(tr, tr->patrat); 
+  gatherRatesFewPartitionsHelper(tr, tr->patratStored); 
+  gatherRatesFewPartitionsHelper(tr, tr->lhs); 
+}
+
+
+/* all this function does, is gather tr->patrat tr->patratStored,
+   tr->lhs in the master */
+/* static void gatherRatesFewPartitions(tree *tr, int tid) */
+/* { */
+/*   size_t */
+/*     n = ABS_NUM_RANK; */
+
+/*   if(ABS_ID(tr) == 0) */
+/*     { */
+/*       int */
+/* 	model; */
+
+/*       size_t */
+/* 	localCounter, */
+/* 	i, */
+/* 	sendBufferSize = (tr->originalCrunchedLength / n) + 1, */
+/* 	recvBufferSize = sendBufferSize * n; */
+
+/*         double */
+/*           *patBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
+/*           *patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)), */
+/*           *lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
+/*           *patBufRecv = (double *)malloc(recvBufferSize * sizeof(double)), */
+/*           *patStoredBufRecv =  (double *)malloc(recvBufferSize * sizeof(double)), */
+/*           *lhsBufRecv = (double *)malloc(recvBufferSize * sizeof(double)); */
+
+/*         for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++) */
+/* 	  { */
+/* 	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++) */
+/* 	      if(i % n == (size_t)tid) */
+/* 		{ */
+/* 		  patBufSend[localCounter] = tr->patrat[i]; */
+/* 		  patStoredBufSend[localCounter] = tr->patratStored[i]; */
+/* 		  lhsBufSend[localCounter] = tr->lhs[i]; */
+/* 		  localCounter++; */
+/* 		} */
+/* 	  } */
+
+/*         int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/*         mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/*         mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/* 	if(mpiErr != MPI_SUCCESS) */
+/* 	  { */
+/* 	    puts("not implemented."); */
+/* 	    assert(0); */
+/* 	  } */
+
+/*         for(model = 0; model < tr->NumberOfModels; model++) */
+/* 	  { */
+/* 	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++) */
+/* 	      { */
+/* 		int */
+/* 		  offset = i % n, */
+/* 		  position = i / n; */
+		
+/* 		tr->patrat[i]       = patBufRecv[offset * sendBufferSize + position]; */
+/* 		tr->patratStored[i] = patStoredBufRecv[offset * sendBufferSize + position]; */
+/* 		tr->lhs[i]                = lhsBufRecv[offset * sendBufferSize + position]; */
+/* 	      } */
+/* 	  } */
+
+/*         free(patBufSend); */
+/*         free(patStoredBufSend); */
+/*         free(lhsBufSend); */
+/*         free(patBufRecv); */
+/*         free(patStoredBufRecv); */
+/*         free(lhsBufRecv); */
+/*     } */
+/*   else */
+/*     { */
+/*       int */
+/* 	model; */
+      
+/*       size_t */
+/* 	i, */
+/* 	localCounter, */
+/* 	sendBufferSize = (tr->originalCrunchedLength / n) + 1; */
+      
+/*       double */
+/* 	*localDummy = (double*)NULL, */
+/* 	*patBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
+/* 	*patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)), */
+/* 	*lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double)); */
+      
+/*       for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++) */
+/* 	{ */
+/* 	  for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++) */
+/* 	    if(i % n == (size_t)tid) */
+/* 	      { */
+/* 		patBufSend[localCounter] = tr->patrat[i]; */
+/* 		patStoredBufSend[localCounter] = tr->patratStored[i]; */
+/* 		lhsBufSend[localCounter] = tr->lhs[i]; */
+/* 		localCounter++; */
+/* 	      } */
+/* 	} */
+      
+/*       int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/*       mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/*       mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
+/*       if(mpiErr != MPI_SUCCESS) */
+/* 	{ */
+/* 	  puts("not implemented."); */
+/* 	  assert(0); */
+/* 	} */
+      
+/*       free(patBufSend); */
+/*       free(patStoredBufSend); */
+/*       free(lhsBufSend); */
+/*     } */
+/* } */
 
 
 
@@ -2555,6 +2703,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 
       if(tr->manyPartitions)
 	{
+	  assert(0); 		/* not implemented yet  */
 	  for(model = 0; model < tr->NumberOfModels; model++)      
 	    if(isThisMyPartition(tr, model))
 	      optRateCatModel(tr, model, lower_spacing, upper_spacing, tr->lhs);
@@ -2562,7 +2711,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
       else
 	{
 	  optRateCatPthreads(tr, lower_spacing, upper_spacing, tr->lhs, mpiState.commSize, mpiState.rank);
-	  gatherRatesFewPartitions(tr, mpiState.rank);
+	  gatherRatesFewPartitions(tr);
 	}     
            
       for(model = 0; model < tr->NumberOfModels; model++)

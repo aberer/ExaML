@@ -817,10 +817,7 @@ typedef  struct  {
   int *siteToProcess; 
 #endif
 
-/* #ifdef _HYBRID */
   int threadId; 
-/* #endif */
-
 
   /* more global variables */
   int Thorough; 
@@ -830,6 +827,8 @@ typedef  struct  {
   double *reductionBuffer; 
   
   double rrf; 
+  double *sendBuf;
+  double *recvBuf;
   
 } tree;
 
