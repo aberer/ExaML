@@ -1161,7 +1161,7 @@ extern stringHashtable *initStringHashTable(hashNumberType n);
 extern void addword(char *s, stringHashtable *h, int nodeNumber);
 
 
-extern void printBothOpen(const char* format, ... );
+extern void printBothOpen(tree *tr, const char* format, ... );
 extern void initRateMatrix(tree *tr);
 
 extern void bitVectorInitravSpecial(unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength, hashtable *h, int treeNumber, int function, branchInfo *bInf,

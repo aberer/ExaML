@@ -2852,7 +2852,7 @@ static void printAAmatrix(tree *tr, double epsilon)
 
 	      fclose(gtrFile);
 
-	      printBothOpen("\nPrinted intermediate AA substitution matrix to file %s\n\n", gtrFileName);
+	      printBothOpen(tr,"\nPrinted intermediate AA substitution matrix to file %s\n\n", gtrFileName);
 	      
 	      break;
 	    }
@@ -2922,7 +2922,7 @@ static void autoProtein(tree *tr)
 	    }       
 	}
 
-      printBothOpen("\n\n");
+      printBothOpen(tr,"\n\n");
       
       for(model = 0; model < tr->NumberOfModels; model++)
 	{	   
@@ -2932,11 +2932,11 @@ static void autoProtein(tree *tr)
 
 	      initReversibleGTR(tr, model);  
 
-	      printBothOpen("Partition: %d best-scoring AA model: %s likelihood %f\n", model, protModels[tr->partitionData[model].autoProtModels], bestScores[model]);
+	      printBothOpen(tr,"Partition: %d best-scoring AA model: %s likelihood %f\n", model, protModels[tr->partitionData[model].autoProtModels], bestScores[model]);
 	    }	 
 	}
       
-      printBothOpen("\n\n");
+      printBothOpen(tr,"\n\n");
             
 
 
@@ -3014,8 +3014,8 @@ void modOpt(tree *tr, double likelihoodEpsilon)
       printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood));    
 
       /* puts("finished one step of optimization");  */
-      if(ABS_ID(tr) == 0)
-	printf("did one round of opt\n"); 
+      /* if(ABS_ID(tr) == 0) */
+	/* printf("did one round of opt\n");  */
 
     }
   while(fabs(currentLikelihood - tr->likelihood) > likelihoodEpsilon);  

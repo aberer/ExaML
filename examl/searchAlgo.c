@@ -1104,7 +1104,7 @@ static void writeCheckpoint(tree *tr)
 
   fclose(f); 
 
-  printBothOpen("\nCheckpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood);
+  printBothOpen(tr,"\nCheckpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood);
 }
 
 static void readTree(tree *tr, FILE *f)
@@ -1173,7 +1173,7 @@ static void readTree(tree *tr, FILE *f)
   
   evaluateGeneric(tr, tr->start, TRUE);  
 
-  printBothOpen("RAxML Restart with likelihood: %1.50f\n", tr->likelihood);
+  printBothOpen(tr,"RAxML Restart with likelihood: %1.50f\n", tr->likelihood);
 }
 
 
@@ -1597,13 +1597,13 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       if((!adef->useCheckpoint) || (adef->useCheckpoint && ckp.state == REARR_SETTING))
 	{
 	  bestTrav = adef->bestTrav = determineRearrangementSetting(tr, adef, bestT, bt, bestML);     	  
-	  printBothOpen("\nBest rearrangement radius: %d\n", bestTrav);
+	  printBothOpen(tr, "\nBest rearrangement radius: %d\n", bestTrav);
 	}
     }
   else
     {
       bestTrav = adef->bestTrav = adef->initial;       
-      printBothOpen("\nUser-defined rearrangement radius: %d\n", bestTrav);
+      printBothOpen(tr,"\nUser-defined rearrangement radius: %d\n", bestTrav);
     }
 
   
@@ -1779,14 +1779,14 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	      
 	      if(rrf <= 0.01) /* 1% cutoff */
 		{
-		  printBothOpen("ML fast search converged at fast SPR cycle %d with stopping criterion\n", fastIterations);
-		  printBothOpen("Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", rrf, "%");
+		  printBothOpen(tr,"ML fast search converged at fast SPR cycle %d with stopping criterion\n", fastIterations);
+		  printBothOpen(tr,"Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", rrf, "%");
 		  cleanupHashTable(tr->h, 0);
 		  cleanupHashTable(tr->h, 1);
 		  goto cleanup_fast;
 		}
 	      else		    
-		printBothOpen("ML search convergence criterion fast cycle %d->%d Relative Robinson-Foulds %f\n", fastIterations - 1, fastIterations, rrf);
+		printBothOpen(tr,"ML search convergence criterion fast cycle %d->%d Relative Robinson-Foulds %f\n", fastIterations - 1, fastIterations, rrf);
 	    }
 	}
 
@@ -2067,12 +2067,12 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 		  
 		  if(rrf <= 0.01) /* 1% cutoff */
 		    {
-		      printBothOpen("ML search converged at thorough SPR cycle %d with stopping criterion\n", thoroughIterations);
-		      printBothOpen("Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", rrf, "%");
+		      printBothOpen(tr,"ML search converged at thorough SPR cycle %d with stopping criterion\n", thoroughIterations);
+		      printBothOpen(tr,"Relative Robinson-Foulds (RF) distance between respective best trees after one succseful SPR cycle: %f%s\n", rrf, "%");
 		      goto cleanup;
 		    }
 		  else		    
-		    printBothOpen("ML search convergence criterion thorough cycle %d->%d Relative Robinson-Foulds %f\n", thoroughIterations - 1, thoroughIterations, rrf);
+		    printBothOpen(tr,"ML search convergence criterion thorough cycle %d->%d Relative Robinson-Foulds %f\n", thoroughIterations - 1, thoroughIterations, rrf);
 		}
 	    }
 	  
@@ -2158,7 +2158,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   printBothOpen("After SLOW SPRs Final %f\n", tr->likelihood);   
 #endif
    
-  printBothOpen("\nLikelihood of best tree: %f\n", tr->likelihood);
+  printBothOpen(tr,"\nLikelihood of best tree: %f\n", tr->likelihood);
   /* print the absolut best tree */
 
   printLog(tr);
@@ -2172,13 +2172,13 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	fileName[2048] = "",
 	buf[64] = "";
      
-      printBothOpen("\n\nEvaluating %d other good ML trees\n\n", bestML->nvalid);
+      printBothOpen(tr,"\n\nEvaluating %d other good ML trees\n\n", bestML->nvalid);
       
       for(i = 1; i <= bestML->nvalid; i++)
 	{		 
 	  recallBestTree(bestML, i, tr);	 	    	    		  
 	  /*treeEvaluate(tr, 0.25);*/
-	  printBothOpen("tree %d likelihood %1.80f\n", i, tr->likelihood);
+	  printBothOpen(tr,"tree %d likelihood %1.80f\n", i, tr->likelihood);
 
 	  if(mpiState.rank == 0)
 	    { 	      		
@@ -2203,7 +2203,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	  
 	}      
 	
-      printBothOpen("\n\nOther good trees written to file %s\n", fileName);			
+      printBothOpen(tr,"\n\nOther good trees written to file %s\n", fileName);			
     }
 
 

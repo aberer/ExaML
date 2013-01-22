@@ -114,9 +114,9 @@ void *malloc_aligned(size_t size)
 
 
 
-static void printBoth(FILE *f, const char* format, ... )
+static void printBoth(tree *tr, FILE *f, const char* format, ... )
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       va_list args;
       va_start(args, format);
@@ -129,9 +129,9 @@ static void printBoth(FILE *f, const char* format, ... )
     }
 }
 
-void printBothOpen(const char* format, ... )
+void printBothOpen(tree *tr, const char* format, ... )
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       FILE *f = myfopen(infoFileName, "ab");
       
@@ -877,7 +877,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       }
     }
 
-
+  
   if(!byteFileSet)
     {
       if(mpiState.rank == 0)
@@ -945,6 +945,14 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
       }
    }
 
+
+   if(adef->mode == TREE_EVALUATION && tr->rateHetModel == CAT)
+     {
+       if(ABS_ID(tr) == 0)
+	 printf("Refusing to do model optimization and likelihood evaluation under the CAT model. \nFor different rate category to site assignments, likelihoods are not comparable. Rate categories cannot be assigned by the user currently, so in other words: \nNot implemented yet.\n "); 
+       errorExit(-1,tr);
+     }
+
   return;
 }
 
@@ -998,8 +1006,10 @@ int errorExit(int e, tree *tr)
 
 
 
-static void makeFileNames(void)
+static void makeFileNames(tree *tr)
 {
+  assert(ABS_ID(tr) == 0); 
+
   int 
     infoFileExists = 0;
     
@@ -1048,10 +1058,10 @@ static void makeFileNames(void)
 /********************PRINTING various INFO **************************************/
 
 
-#ifndef  _NOT_PRODUCTIVE
+/* #ifndef  _NOT_PRODUCTIVE */
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       int i, model;
       FILE *infoFile = myfopen(infoFileName, "ab");
@@ -1063,23 +1073,26 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       else
 	strcpy(modelType, "GAMMA");   
      
-      printBoth(infoFile, "\n\nThis is %s version %s released by Alexandros Stamatakis in %s.\n\n",  programName, programVersion, programDate);
+      printBoth(tr, infoFile, "\n\nThis is %s version %s released by Alexandros Stamatakis in %s.\n\n",  programName, programVersion, programDate);
      
       
       
      
-      printBoth(infoFile, "\nAlignment has %d distinct alignment patterns\n\n",  tr->originalCrunchedLength);
+      printBoth(tr,infoFile, "\nAlignment has %d distinct alignment patterns\n\n",  tr->originalCrunchedLength);
       
      
       
-      printBoth(infoFile, "Proportion of gaps and completely undetermined characters in this alignment: %3.2f%s\n", 100.0 * tr->gapyness, "%");
+      printBoth(tr,infoFile, "Proportion of gaps and completely undetermined characters in this alignment: %3.2f%s\n", 100.0 * tr->gapyness, "%"); 
       
 
       switch(adef->mode)
 	{	
 	case  BIG_RAPID_MODE:	 
-	  printBoth(infoFile, "\nExaML rapid hill-climbing mode\n\n");
+	  printBoth(tr, infoFile, "\nExaML rapid hill-climbing mode\n\n");
 	  break;	
+	case TREE_EVALUATION: 
+	  printBoth(tr, infoFile, "\nExaML Model Optimization up to an accuracy of %f log likelihood units\n\n", adef->likelihoodEpsilon);
+	  break; 
 	default:
 	  assert(0);
 	}
@@ -1087,9 +1100,9 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
      
 	  
       if(adef->perGeneBranchLengths)
-	printBoth(infoFile, "Using %d distinct models/data partitions with individual per partition branch length optimization\n\n\n", tr->NumberOfModels);
+	printBoth(tr, infoFile, "Using %d distinct models/data partitions with individual per partition branch length optimization\n\n\n", tr->NumberOfModels);
       else
-	printBoth(infoFile, "Using %d distinct models/data partitions with joint branch length optimization\n\n\n", tr->NumberOfModels);	
+	printBoth(tr, infoFile, "Using %d distinct models/data partitions with joint branch length optimization\n\n\n", tr->NumberOfModels);	
 	
 
       
@@ -1098,15 +1111,15 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
       
       
-      printBoth(infoFile, "All free model parameters will be estimated by ExaML\n");
+      printBoth(tr, infoFile, "All free model parameters will be estimated by ExaML\n");
       
      
 	
       if(tr->rateHetModel == GAMMA || tr->rateHetModel == GAMMA_I)
-	printBoth(infoFile, "%s model of rate heteorgeneity, ML estimate of alpha-parameter\n\n", modelType);
+	printBoth(tr, infoFile, "%s model of rate heteorgeneity, ML estimate of alpha-parameter\n\n", modelType);
       else
 	{
-	  printBoth(infoFile, "ML estimate of %d per site rate categories\n\n", tr->categories);
+	  printBoth(tr, infoFile, "ML estimate of %d per site rate categories\n\n", tr->categories);
 	  /*
 	    if(adef->mode != CLASSIFY_ML)
 	    printBoth(infoFile, "Likelihood of final tree will be evaluated and optimized under %s\n\n", modelType);
@@ -1122,79 +1135,79 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       
       for(model = 0; model < tr->NumberOfModels; model++)
 	{
-	  printBoth(infoFile, "Partition: %d\n", model);
-	  printBoth(infoFile, "Alignment Patterns: %d\n", tr->partitionData[model].upper - tr->partitionData[model].lower);
-	  printBoth(infoFile, "Name: %s\n", tr->partitionData[model].partitionName);
+	  printBoth(tr, infoFile, "Partition: %d\n", model);
+	  printBoth(tr, infoFile, "Alignment Patterns: %d\n", tr->partitionData[model].upper - tr->partitionData[model].lower);
+	  printBoth(tr, infoFile, "Name: %s\n", tr->partitionData[model].partitionName);
 	  
 	  switch(tr->partitionData[model].dataType)
 	    {
 	    case DNA_DATA:
-	      printBoth(infoFile, "DataType: DNA\n");	     
-	      printBoth(infoFile, "Substitution Matrix: GTR\n");
+	      printBoth(tr, infoFile, "DataType: DNA\n");	     
+	      printBoth(tr, infoFile, "Substitution Matrix: GTR\n");
 	      break;
 	    case AA_DATA:
 	      assert(tr->partitionData[model].protModels >= 0 && tr->partitionData[model].protModels < NUM_PROT_MODELS);
-	      printBoth(infoFile, "DataType: AA\n");	      
-	      printBoth(infoFile, "Substitution Matrix: %s\n", protModels[tr->partitionData[model].protModels]);
-	      printBoth(infoFile, "%s Base Frequencies:\n", (tr->partitionData[model].protFreqs == 1)?"Empirical":"Fixed");	     
+	      printBoth(tr, infoFile, "DataType: AA\n");	      
+	      printBoth(tr, infoFile, "Substitution Matrix: %s\n", protModels[tr->partitionData[model].protModels]);
+	      printBoth(tr, infoFile, "%s Base Frequencies:\n", (tr->partitionData[model].protFreqs == 1)?"Empirical":"Fixed");	     
 	      break;
 	    case BINARY_DATA:
-	      printBoth(infoFile, "DataType: BINARY/MORPHOLOGICAL\n");	      
-	      printBoth(infoFile, "Substitution Matrix: Uncorrected\n");
+	      printBoth(tr, infoFile, "DataType: BINARY/MORPHOLOGICAL\n");	      
+	      printBoth(tr, infoFile, "Substitution Matrix: Uncorrected\n");
 	      break;
 	    case SECONDARY_DATA:
-	      printBoth(infoFile, "DataType: SECONDARY STRUCTURE\n");	     
-	      printBoth(infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
+	      printBoth(tr, infoFile, "DataType: SECONDARY STRUCTURE\n");	     
+	      printBoth(tr, infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
 	      break;
 	    case SECONDARY_DATA_6:
-	      printBoth(infoFile, "DataType: SECONDARY STRUCTURE 6 STATE\n");	     
-	      printBoth(infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
+	      printBoth(tr, infoFile, "DataType: SECONDARY STRUCTURE 6 STATE\n");	     
+	      printBoth(tr, infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
 	      break;
 	    case SECONDARY_DATA_7:
-	      printBoth(infoFile, "DataType: SECONDARY STRUCTURE 7 STATE\n");	      
-	      printBoth(infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
+	      printBoth(tr, infoFile, "DataType: SECONDARY STRUCTURE 7 STATE\n");	      
+	      printBoth(tr, infoFile, "Substitution Matrix: %s\n", secondaryModelList[tr->secondaryStructureModel]);
 	      break;
 	    case GENERIC_32:
-	      printBoth(infoFile, "DataType: Multi-State with %d distinct states in use (maximum 32)\n",tr->partitionData[model].states);		  
+	      printBoth(tr, infoFile, "DataType: Multi-State with %d distinct states in use (maximum 32)\n",tr->partitionData[model].states);		  
 	      switch(tr->multiStateModel)
 		{
 		case ORDERED_MULTI_STATE:
-		  printBoth(infoFile, "Substitution Matrix: Ordered Likelihood\n");
+		  printBoth(tr, infoFile, "Substitution Matrix: Ordered Likelihood\n");
 		  break;
 		case MK_MULTI_STATE:
-		  printBoth(infoFile, "Substitution Matrix: MK model\n");
+		  printBoth(tr, infoFile, "Substitution Matrix: MK model\n");
 		  break;
 		case GTR_MULTI_STATE:
-		  printBoth(infoFile, "Substitution Matrix: GTR\n");
+		  printBoth(tr, infoFile, "Substitution Matrix: GTR\n");
 		  break;
 		default:
 		  assert(0);
 		}
 	      break;
 	    case GENERIC_64:
-	      printBoth(infoFile, "DataType: Codon\n");		  
+	      printBoth(tr, infoFile, "DataType: Codon\n");		  
 	      break;		
 	    default:
 	      assert(0);
 	    }
-	  printBoth(infoFile, "\n\n\n");
+	  printBoth(tr, infoFile, "\n\n\n");
 	}
       
-      printBoth(infoFile, "\n");
+      printBoth(tr, infoFile, "\n");
 
-      printBoth(infoFile, "ExaML was called as follows:\n\n");
+      printBoth(tr, infoFile, "ExaML was called as follows:\n\n");
       for(i = 0; i < argc; i++)
-	printBoth(infoFile,"%s ", argv[i]);
-      printBoth(infoFile,"\n\n\n");
+	printBoth(tr, infoFile,"%s ", argv[i]);
+      printBoth(tr, infoFile,"\n\n\n");
 
       fclose(infoFile);
     }
 }
-#endif
+/* #endif */
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       FILE *logFile;
       char temporaryFileName[1024] = "";
@@ -1277,7 +1290,7 @@ void printResult(tree *tr, analdef *adef, boolean finalPrint)
 
 void printLog(tree *tr)
 {
-  if(mpiState.rank == 0)
+  if(ABS_ID(tr) == 0)
     {
       FILE *logFile;
       double t;
@@ -1338,43 +1351,38 @@ void getDataTypeString(tree *tr, int model, char typeOfData[1024])
 
 static void finalizeInfoFile(tree *tr, analdef *adef)
 {
-  if(ABS_ID(tr) == 0)
-    {
-      double t;
+  assert(ABS_ID(tr) == 0); 
+  double t;
 
-      t = gettime() - masterTime;
-      accumulatedTime = accumulatedTime + t;
+  t = gettime() - masterTime;
+  accumulatedTime = accumulatedTime + t;
 
-      switch(adef->mode)
-	{	
-	case  BIG_RAPID_MODE:	 
-	  printBothOpen("\n\nOverall Time for 1 Inference %f\n", t);
-	  printBothOpen("\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime);
-	  printBothOpen("Likelihood   : %f\n", tr->likelihood);
-	  printBothOpen("\n\n");	  	  
-	  printBothOpen("Final tree written to:                 %s\n", resultFileName);
-	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
-	  printBothOpen("Execution information file written to: %s\n",infoFileName);	
-	  break;
+  switch(adef->mode)
+    {	
+    case  BIG_RAPID_MODE:	 
+      printBothOpen(tr, "\n\nOverall Time for 1 Inference %f\n", t);
+      printBothOpen(tr, "\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime);
+      printBothOpen(tr, "Likelihood   : %f\n", tr->likelihood);
+      printBothOpen(tr, "\n\n");	  	  
+      printBothOpen(tr, "Final tree written to:                 %s\n", resultFileName);
+      printBothOpen(tr, "Execution Log File written to:         %s\n", logFileName);
+      printBothOpen(tr, "Execution information file written to: %s\n",infoFileName);	
+      break;
 
-	case TREE_EVALUATION:
-	  printBothOpen("\n\nOverall Time for 1 Inference %f\n", t);
-	  /* printBothOpen("\nOverall accumulated Time (in case of restarts): %f\n\n", accumulatedTime); */
-	  /* printBothOpen("Likelihood   : %f\n", tr->likelihood); */
-	  printf("\n\n"); 
-	  printBothOpen("Final GAMMA  likelihood: %f\n", tr->likelihood);
-	  printBothOpen("\n\n");	  	  
-	  printBothOpen("Final tree written to:                 %s\n", resultFileName);
-	  printBothOpen("Execution Log File written to:         %s\n", logFileName);
-	  printBothOpen("Execution information file written to: %s\n",infoFileName); 
-	  break; 
-	default:
-	  assert(0);
-	}
-
-	 
-    }
+    case TREE_EVALUATION:
+      printBothOpen(tr, "\n\nOverall Time for 1 Inference %f\n", t);
+      printBothOpen(tr, "\n\n"); 
+      printBothOpen(tr,"Final GAMMA  likelihood: %f\n", tr->likelihood);
+      printBothOpen(tr,"\n\n");	  	  
+      printBothOpen(tr,"Final tree written to:                 %s\n", resultFileName);
+      printBothOpen(tr,"Execution Log File written to:         %s\n", logFileName);
+      printBothOpen(tr,"Execution information file written to: %s\n",infoFileName); 
+      break; 
+    default:
+      assert(0);
+    } 
 }
+
 
 
 /************************************************************************************/
@@ -1391,38 +1399,8 @@ void makeItUntilHere(tree *tr)
 
 
 
-/**
-   @brief Is wrapped by the main function. Thus, we can have this
-   function as an entry point for the pthreads.
- */
-int realMain(int tid, int argc, char *argv[])
-{  
-  tree *tr = calloc(1,sizeof(tree));  
-  analdef *adef = calloc(1,sizeof(analdef)); 
-
-  initAdef(adef);
-
-  /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
-  get_args(argc, argv, adef, tr); 
-
-  tr->threadId = tid;
-#ifdef _HYBRID
-  threadBarrier(tid);
-  mpiState.allTrees[tr->threadId] = tr; 
-#endif
-
-  /* generate the ExaML output file names and store them in strings */  
-  makeFileNames();  
-
-#ifndef _NOT_PRODUCTIVE
-  if(ABS_ID(tr) == 0)  
-    {
-      printModelAndProgramInfo(tr, adef, argc, argv);  
-      printBothOpen("Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
-    }  
-#endif
-
-
+static void ignoreDenormFloats()
+{
   /* 
      tell the CPU to ignore exceptions generated by denormalized floating point values.
      If this is not done, depending on the input data, the likelihood functions can exhibit 
@@ -1433,8 +1411,47 @@ int realMain(int tid, int argc, char *argv[])
   _mm_setcsr( _mm_getcsr() | _MM_FLUSH_ZERO_ON);
 #endif     
 
+}
+
+
+/**
+   @brief Is wrapped by the main function. Thus, we can have this
+   function as an entry point for the pthreads.
+ */
+int realMain(int tid, int argc, char *argv[])
+{  
+  tree *tr = calloc(1,sizeof(tree));  
+  analdef *adef = calloc(1,sizeof(analdef)); 
+
+  ignoreDenormFloats();
+
+  initAdef(adef);
+
+  /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
+  get_args(argc, argv, adef, tr); 
+
+  tr->threadId = tid;
+
+
+  /* generate the ExaML output file names and store them in strings */  
+  if(ABS_ID(tr) == 0)
+    makeFileNames(tr);  
 
   initializeTree(tr, adef); 
+
+/* #ifndef _NOT_PRODUCTIVE */
+  if(ABS_ID(tr) == 0)  
+    {
+      printModelAndProgramInfo(tr, adef, argc, argv);  
+      printBothOpen(tr,"Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
+    }  
+/* #endif */
+
+#ifdef _HYBRID
+  threadBarrier(tid);
+  mpiState.allTrees[tr->threadId] = tr; 
+#endif
+
 
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,

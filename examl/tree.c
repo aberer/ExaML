@@ -226,7 +226,7 @@ static void multiprocessorScheduling(tree *tr)
     }
 
   if(ABS_ID(tr) == 0 )
-    printBothOpen("\nMulti-processor partition data distribution enabled (-Q option)\n");
+    printBothOpen(tr,"\nMulti-processor partition data distribution enabled (-Q option)\n");
 
   for(s = 0; s < arrayLength; s++)
     {
@@ -286,9 +286,9 @@ static void multiprocessorScheduling(tree *tr)
 	  if(ABS_ID(tr) == 0)
 	    {
 	      for(i = 0; i < n; i++)	       
-		printBothOpen("Process %d has %d sites for %d state model \n", i, assignments[i], modelStates[s]); 
+		printBothOpen(tr,"Process %d has %d sites for %d state model \n", i, assignments[i], modelStates[s]); 
 	      
-	      printBothOpen("\n");
+	      printBothOpen(tr,"\n");
 	    }
 
 	  for(i = 0; i < n; i++)
