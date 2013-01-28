@@ -63,6 +63,61 @@ boolean initrav (tree *tr, nodeptr p)
 
 
 
+static void reorderNodes(tree *tr, nodeptr *np, nodeptr p, int *count)
+{
+  int i, found = 0;
+
+  if(isTip(p->number, tr->mxtips))
+    return;
+  else
+    {
+      for(i = tr->mxtips + 1; (i <= (tr->mxtips + tr->mxtips - 1)) && (found == 0); i++)
+	{
+	  if (p == np[i] || p == np[i]->next || p == np[i]->next->next)
+	    {
+	      if(p == np[i])
+		tr->nodep[*count + tr->mxtips + 1] = np[i];
+	      else
+		{
+		  if(p == np[i]->next)
+		    tr->nodep[*count + tr->mxtips + 1] = np[i]->next;
+		  else
+		    tr->nodep[*count + tr->mxtips + 1] = np[i]->next->next;
+		}
+
+	      found = 1;
+	      *count = *count + 1;
+	    }
+	}
+      
+      assert(found != 0);
+     
+      reorderNodes(tr, np, p->next->back, count);
+      reorderNodes(tr, np, p->next->next->back, count);
+    }
+}
+
+void nodeRectifier(tree *tr)
+{
+  nodeptr *np = (nodeptr *)malloc(2 * tr->mxtips * sizeof(nodeptr));
+  int i;
+  int count = 0;
+  
+  tr->start       = tr->nodep[1];
+  tr->rooted      = FALSE;
+
+  /* TODO why is tr->rooted set to FALSE here ?*/
+  
+  for(i = tr->mxtips + 1; i <= (tr->mxtips + tr->mxtips - 1); i++)
+    np[i] = tr->nodep[i];
+  
+  reorderNodes(tr, np, tr->start->back, &count);
+
+ 
+  free(np);
+}
+
+
 
 
 
@@ -1113,9 +1168,6 @@ static void readTree(tree *tr, FILE *f)
     nodeNumber,   
     x = tr->mxtips + 3 * (tr->mxtips - 1);
 
- 
-
-  
   
   nodeptr
     startAddress;
@@ -1206,7 +1258,7 @@ static void readCheckpoint(tree *tr, const checkPointState* const chkpnt, FILE *
   myfread(tr->tree0, sizeof(char), tr->treeStringLength, f);
   myfread(tr->tree1, sizeof(char), tr->treeStringLength, f);
 
-  if(tr->searchConvergenceCriterion && (ABS_ID(tr) == 0))
+  if(tr->searchConvergenceCriterion && (ABS_ID(tr->threadId) == 0))
     {
       int bCounter = 0;
       
@@ -1220,7 +1272,7 @@ static void readCheckpoint(tree *tr, const checkPointState* const chkpnt, FILE *
 
 	  treeReadTopologyString(tr->tree0, tr);   
 	  
-	  bitVectorInitravSpecial(tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, 0, BIPARTITIONS_RF, (branchInfo *)NULL,
+	  bitVectorInitravSpecial(tr, tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, 0, BIPARTITIONS_RF, (branchInfo *)NULL,
 				  &bCounter, 1, FALSE, FALSE);
 	  
 	  assert(bCounter == tr->mxtips - 3);
@@ -1238,7 +1290,7 @@ static void readCheckpoint(tree *tr, const checkPointState* const chkpnt, FILE *
 
 	  treeReadTopologyString(tr->tree1, tr); 
 	  
-	  bitVectorInitravSpecial(tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, 1, BIPARTITIONS_RF, (branchInfo *)NULL,
+	  bitVectorInitravSpecial(tr, tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, 1, BIPARTITIONS_RF, (branchInfo *)NULL,
 				  &bCounter, 1, FALSE, FALSE);
 	  
 	  assert(bCounter == tr->mxtips - 3);
@@ -1379,7 +1431,7 @@ int determineRearrangementSetting(tree *tr,  analdef *adef, bestlist *bestT, bes
       recallBestTree(bestT, 1, tr);     
       nodeRectifier(tr);            
     
-      if(ABS_ID(tr) == 0)
+      if(ABS_ID(tr->threadId) == 0)
 	{
 	  ckp.optimizeRateCategoryInvocations = tr->optimizeRateCategoryInvocations;
 	  
@@ -1517,7 +1569,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   
   /* initialization for the hash table to compute RF distances */
 
-  if(tr->searchConvergenceCriterion && ABS_ID(tr) == 0)
+  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
     treeVectorLength = 1;
      
   /* initialize two lists of size 1 and size 20 that will keep track of the best 
@@ -1576,8 +1628,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
   
 
-  /* print some stuff to the RAxML_log file */
-
+  /* print some stuff to the RAxML_log file */  
   printLog(tr); 
 
   /* save the current tree (which is the input tree parsed via -t in the bestT list */
@@ -1690,7 +1741,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
       /* save states of algorithmic/heuristic variables for printing the next checkpoint */
 
-      if(ABS_ID(tr) == 0)
+      if(ABS_ID(tr->threadId) == 0)
 	{ 
 	  ckp.state = FAST_SPRS;  
 	  ckp.optimizeRateCategoryInvocations = tr->optimizeRateCategoryInvocations;              
@@ -1734,7 +1785,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       /* this is the aforementioned convergence criterion that requires computing the RF,
 	 let's not worry about this right now */
 
-      if(tr->searchConvergenceCriterion && ABS_ID(tr) == 0)
+      if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
 	{
 	  int 
 	    bCounter = 0; 
@@ -1746,7 +1797,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	    cleanupHashTable(tr->h, (fastIterations % 2));		
 	    	  	 
 
-	  bitVectorInitravSpecial(tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, fastIterations % 2, BIPARTITIONS_RF, (branchInfo *)NULL,
+	  bitVectorInitravSpecial(tr, tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, fastIterations % 2, BIPARTITIONS_RF, (branchInfo *)NULL,
 				  &bCounter, 1, FALSE, FALSE);	    
 	  	  
 	   
@@ -1784,7 +1835,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	    }
 	}
 
-      if(tr->searchConvergenceCriterion && ABS_ID(tr) != 0 && fastIterations > 0)
+      if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) != 0 && fastIterations > 0)
 	{
 
 	  HYBRID_BCAST_VAR_1(tr, rrf, MPI_DOUBLE); 
@@ -1808,7 +1859,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       saveBestTree(bestT, tr, TRUE);           
 
       /* print the log likelihood */
-
+      
       printLog(tr);    
 
       /* print this intermediate tree to file */
@@ -1872,7 +1923,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
      a copy of this book is in my office */
 
-  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
+  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
     {
       cleanupHashTable(tr->h, 0);
       cleanupHashTable(tr->h, 1);
@@ -1958,7 +2009,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
       /* now, we write a checkpoint */
       
-      if(mpiState.rank == 0)
+      if(ABS_ID(tr->threadId) == 0)
 	{              
 	  ckp.state = SLOW_SPRS;  
 	  ckp.optimizeRateCategoryInvocations = tr->optimizeRateCategoryInvocations;              
@@ -2010,7 +2061,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	 
 	  /* once again the convergence criterion */
 
-	  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
+	  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
 	    {
 	      int 
 		bCounter = 0;	   	
@@ -2021,7 +2072,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	      if(thoroughIterations > 1)
 		cleanupHashTable(tr->h, (thoroughIterations % 2));		
 		
-	      bitVectorInitravSpecial(tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, thoroughIterations % 2, BIPARTITIONS_RF, (branchInfo *)NULL,
+	      bitVectorInitravSpecial(tr, tr->bitVectors, tr->nodep[1]->back, tr->mxtips, tr->vLength, tr->h, thoroughIterations % 2, BIPARTITIONS_RF, (branchInfo *)NULL,
 				      &bCounter, 1, FALSE, FALSE);	    
 	      	     	    	   
 	      	      	
@@ -2063,7 +2114,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 		}
 	    }
 	  
-	  if(tr->searchConvergenceCriterion && mpiState.rank != 0 && thoroughIterations > 0)
+	  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) != 0 && thoroughIterations > 0)
 	    {
 	      double 
 		rrf;
@@ -2167,7 +2218,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	  /*treeEvaluate(tr, 0.25);*/
 	  printBothOpen(tr,"tree %d likelihood %1.80f\n", i, tr->likelihood);
 
-	  if(mpiState.rank == 0)
+	  if(ABS_ID(tr->threadId) == 0)
 	    { 	      		
 	      FILE 
 		*treeFile;
@@ -2196,7 +2247,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
   /* free data structures */
 
-  if(tr->searchConvergenceCriterion && mpiState.rank == 0)
+  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
     {
       freeBitVectors(tr->bitVectors, 2 * tr->mxtips);
       free(tr->bitVectors);

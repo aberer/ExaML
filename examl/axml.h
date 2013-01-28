@@ -61,7 +61,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-
+#include "genericData.h"
 
 #ifdef __AVX
 #define BYTE_ALIGNMENT 32
@@ -667,6 +667,10 @@ typedef struct {
   double right[1600] __attribute__ ((aligned (BYTE_ALIGNMENT)));
 } siteAAModels;
 
+
+
+
+
 typedef  struct  {
 
   int *ti;
@@ -827,9 +831,11 @@ typedef  struct  {
   double *reductionBuffer; 
   
   double rrf; 
-  double *sendBuf;
-  double *recvBuf;
-  
+  GENERIC_DATA *sendBuf; 
+  GENERIC_DATA *recvBuf;   
+
+  /* :TODO: replace this with something better  */
+  double *TMP ;
 } tree;
 
 
@@ -1005,7 +1011,6 @@ extern void doAllInOne ( tree *tr, analdef *adef );
 
 extern void classifyML(tree *tr, analdef *adef);
 
-extern void resetBranches ( tree *tr );
 extern void modOpt ( tree *tr, double likelihoodEpsilon);
 
 
@@ -1165,7 +1170,7 @@ extern void addword(char *s, stringHashtable *h, int nodeNumber);
 extern void printBothOpen(tree *tr, const char* format, ... );
 extern void initRateMatrix(tree *tr);
 
-extern void bitVectorInitravSpecial(unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength, hashtable *h, int treeNumber, int function, branchInfo *bInf,
+extern void bitVectorInitravSpecial(tree *tr, unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength, hashtable *h, int treeNumber, int function, branchInfo *bInf,
 				    int *countBranches, int treeVectorLength, boolean traverseOnly, boolean computeWRF);
 
 extern int getIncrement(tree *tr, int model);
@@ -1319,14 +1324,23 @@ typedef struct _mpiState
   tree **allTrees; 
   pthread_barrier_t pBarrier; 
 #endif
-
   
-
 } examl_MPI_State; 
-#endif
 
 
 /* extern void threadBarrier(int tid); */
 
 
 extern void makeItUntilHere(tree *tr); 
+
+
+extern void isnanCheck(double *v); 
+
+
+extern void DM(tree *tr, const char *format, ...) ; 
+
+
+extern void resetBranches(tree *tr); 
+extern int isThisHisPartition(tree *tr,  int model, int threadNum);
+
+#endif

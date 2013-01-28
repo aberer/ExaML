@@ -1,11 +1,33 @@
 
+#include "globalVariables.h"
 
-
+void startPthreads(int argc, char *argv[]); 
 void threadBarrier(int tid); 
 
+/* :TODO: god this inlining sucks, figure this out later  */
+#ifdef _DEBUG
+int ABS_ID(int num); 
+int ABS_NUM_RANK(); 
+#else 
+inline int ABS_ID(int num)
+{
+  assert(mpiState.numberOfThreads > 0); 
+  return  (mpiState.rank * mpiState.numberOfThreads) + num ; 
+}
+
+
+inline int ABS_NUM_RANK()
+{
+  assert(mpiState.numberOfThreads > 0); 
+  return mpiState.commSize * mpiState.numberOfThreads; 
+}
+#endif
+
 #ifdef _HYBRID
-#define ABS_ID(tr) ((mpiState.rank  * mpiState.numberOfThreads) + tr->threadId)
-#define ABS_NUM_RANK (mpiState.commSize *  mpiState.numberOfThreads)
+/* #define ABS_ID(num) ((mpiState.rank  * mpiState.numberOfThreads) + num) */
+/* #define ABS_NUM_RANK (mpiState.commSize *  mpiState.numberOfThreads) */
+
+
 
 
 #define MASTER_TREE (mpiState.allTrees[0] )
@@ -30,6 +52,8 @@ void threadBarrier(int tid);
 	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i]; \
   									\
 	MPI_Allreduce(tr->tree_var, buf, length, mpi_type, MPI_SUM, mpiState.comm); \
+	/* MPI_Reduce(tr->tree_var, buf, length, mpi_type, MPI_SUM, 0, mpiState.comm); */ \
+	/* MPI_Bcast(buf, length, mpi_type, 0,  mpiState.comm);	 */	\
   									\
 	for(j = 0; j < mpiState.numberOfThreads; ++j)			\
 	  memcpy(GET_TREE_NUM(j)->tree_var, buf, sizeof(type) * length); \
@@ -107,8 +131,8 @@ void threadBarrier(int tid);
 
 #else 
 
-#define ABS_ID(tr) (mpiState.rank)
-#define ABS_NUM_RANK (mpiState.commSize)
+/* #define ABS_ID(tr) (mpiState.rank) */
+/* #define ABS_NUM_RANK (mpiState.commSize) */
 
 
 #define HYBRID_BCAST_VAR(tr, tree_var,length, mpi_type,type)	\

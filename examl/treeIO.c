@@ -32,6 +32,11 @@
 #include "axml.h"
 #include "globalVariables.h"
 
+nodeptr findAnyTip(nodeptr p, int numsp)
+{
+  return  isTip(p->number, numsp) ? p : findAnyTip(p->next->back, numsp);
+}
+
 
 stringHashtable *initStringHashTable(hashNumberType n)
 {

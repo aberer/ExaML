@@ -6,13 +6,20 @@ if [ $# != 3  ]; then
     exit
 fi
 
+
+
 debugTarget=""
 execOutput="./examl-*"
 if [ $1 == 1 ]; then
     gdb=" urxvt -e gdb -ex run --args "
     debugTarget=" debug"
     execOutput="./debug-examl-*"
+elif [ $1 == 2 ]; then 		# valgrind  
+    gdb=" valgrind --tool=memcheck "
+    debugTarget=" debug"
+    execOutput="./debug-examl-*"    
 fi
+
 
 num=$2
 numThread=$3
@@ -26,7 +33,7 @@ exec=$(ls -tr $execOutput | tail -n 1 )
 model=PSR
 
 
-args=" $aln -m $model $tree -n tmp "
+args=" $aln -m $model $tree -n tmp -Q "
 export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
 export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
 

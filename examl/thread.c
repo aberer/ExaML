@@ -3,6 +3,22 @@
 #include "globalVariables.h"
 
 
+#ifdef _DEBUG
+int ABS_ID(int num)
+{
+  assert(mpiState.numberOfThreads > 0); 
+  return  (mpiState.rank * mpiState.numberOfThreads) + num ; 
+}
+
+
+int ABS_NUM_RANK()
+{
+  assert(mpiState.numberOfThreads > 0); 
+  return mpiState.commSize * mpiState.numberOfThreads; 
+}
+
+#endif
+
 
 
 #ifdef _HYBRID
@@ -15,6 +31,9 @@
 /* #else  */
 /* #include <threads.h> */
 /* #endif */
+
+
+
 
 
 
@@ -62,9 +81,9 @@ void startPthreads(int argc, char *argv[])
   
   mpiState.exitCodes = calloc(mpiState.numberOfThreads,sizeof(int));
 
-  mpiState.barrier = calloc(mpiState.numberOfThreads, sizeof(volatile boolean) );
-  for(t = 0; t < mpiState.numberOfThreads; t++)
-    mpiState.barrier[t] = FALSE;
+  /* mpiState.barrier = calloc(mpiState.numberOfThreads, sizeof(volatile boolean) ); */
+  /* for(t = 0; t < mpiState.numberOfThreads; t++) */
+  /*   mpiState.barrier[t] = FALSE; */
 
   mpiState.allTrees = calloc(mpiState.numberOfThreads, sizeof(tree*)); 
   
@@ -91,51 +110,20 @@ void threadBarrier(int tid)
 }
 
 
-
-/* void threadBarrier(int tid) */
-/* { */
-/*   int i; */
-
-/*   if(tid == 0) */
-/*     { */
-/*       for(i = 0 ;i < mpiState.numberOfThreads; ++i) */
-/*         mpiState.barrier[i] = FALSE; */
-/*       mpiState.barrierIsCrossed = FALSE; */
-/*       mpiState.threadsCanCheckBarrier = TRUE; */
-/*     } */
-/*   else */
-/*     while(NOT mpiState.threadsCanCheckBarrier); */
-
-/*   mpiState.barrier[tid] = TRUE; */
-
-/*   if(tid == 0) */
-/*     { */
-/*       nat sum; */
-/*       do */
-/*         { */
-/*           sum = 0; */
-/*           for(i = 0; i < mpiState.numberOfThreads; ++i) */
-/*             sum += mpiState.barrier[i]; */
-/*         } */
-/*       while(sum < mpiState.numberOfThreads); */
-
-/*       mpiState.threadsCanCheckBarrier = FALSE; */
-/*       mpiState.barrierIsCrossed = TRUE; */
-/*     } */
-/*   else */
-/*     while(NOT mpiState.barrierIsCrossed); */
-/* } */
-
-
 #else 
 #include "axml.h"
-void dummyFunction(int a); 
 
-void dummyFunction(int a)
+
+inline int ABS_ID(int num)
 {
-  printf("o my god, this is annoying %d.\n" ,a ); 
+  return  (mpiState.rank) + num ; 
 }
 
+
+inline int ABS_NUM_RANK()
+{
+  return mpiState.commSize; 
+}
 
 inline void threadBarrier(int tid)
 {

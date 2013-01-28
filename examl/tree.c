@@ -8,7 +8,13 @@
 int isThisMyPartition(tree *tr, int model)
 {  
   assert(tr->manyPartitions); 
-  return ( tr->partitionAssignment[model] == ABS_ID(tr) ) ; 
+  return ( tr->partitionAssignment[model] == ABS_ID(tr->threadId) ) ; 
+}
+
+int isThisHisPartition(tree *tr,  int model, int absRank)
+{  
+  assert(tr->manyPartitions); 
+  return ( tr->partitionAssignment[model] == absRank)  ; 
 }
 
 
@@ -225,7 +231,7 @@ static void multiprocessorScheduling(tree *tr)
       assert(exists);
     }
 
-  if(ABS_ID(tr) == 0 )
+  if(ABS_ID(tr->threadId) == 0 )
     printBothOpen(tr,"\nMulti-processor partition data distribution enabled (-Q option)\n");
 
   for(s = 0; s < arrayLength; s++)
@@ -239,7 +245,7 @@ static void multiprocessorScheduling(tree *tr)
 	  int    
 	    i,
 	    k,
-	    n = ABS_NUM_RANK,
+	    n = ABS_NUM_RANK(),
 	    p = numberOfPartitions[s],    
 	    *assignments = (int *)calloc(n, sizeof(int));  
 	  
@@ -283,7 +289,7 @@ static void multiprocessorScheduling(tree *tr)
 	      tr->partitionAssignment[pt[i].partitionNumber] = minIndex;
 	    }
 
-	  if(ABS_ID(tr) == 0)
+	  if(ABS_ID(tr->threadId) == 0)
 	    {
 	      for(i = 0; i < n; i++)	       
 		printBothOpen(tr,"Process %d has %d sites for %d state model \n", i, assignments[i], modelStates[s]); 
@@ -319,7 +325,7 @@ static void computeFraction(tree *tr)
 
       for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++)
 	{
-	  if(i % ABS_NUM_RANK == ABS_ID(tr))
+	  if(i % ABS_NUM_RANK() == ABS_ID(tr->threadId))
 	    { 
 	      width++;
 	      assigned++; 
@@ -417,8 +423,8 @@ void initializePartitions(tree *tr, FILE *byteFile)
     width,
     model,
     /* offset, */
-    numRank = ABS_NUM_RANK, 
-    myGlobalRank = ABS_ID(tr),
+    numRank = ABS_NUM_RANK(), 
+    myGlobalRank = ABS_ID(tr->threadId),
     countOffset,
     myLength = 0;
 
@@ -729,7 +735,7 @@ void initializeTree(tree *tr, analdef *adef)
    
   setupTree(tr); 
 
-  if(tr->searchConvergenceCriterion && ABS_ID(tr) == 0)
+  if(tr->searchConvergenceCriterion && ABS_ID(tr->threadId) == 0)
     { 
       tr->bitVectors = initBitVector(tr->mxtips, &(tr->vLength));
       tr->h = initHashTable(tr->mxtips * 4);     
@@ -783,11 +789,10 @@ void initializeTree(tree *tr, analdef *adef)
 
   fclose(byteFile);
 
+  tr->reductionBuffer = calloc(2 * tr->numBranches, sizeof(double)); 
 
   initModel(tr, empiricalFrequencies); 
 
-  tr->reductionBuffer = calloc(2 * tr->numBranches, sizeof(double)); 
- 
   for(model = 0; model < (size_t)tr->NumberOfModels; model++)
     free(empiricalFrequencies[model]);
 

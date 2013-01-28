@@ -19,11 +19,11 @@ DEPS=$(SRCDIR)/axml.h $(SRCDIR)/globalVariables.h
 LFLAGS = -lm
 OPT :=  -O2 -fomit-frame-pointer -funroll-loops -march=native
 WARN := -Wall -pedantic  -Wunused-parameter -Wredundant-decls  -Wreturn-type  -Wswitch-default -Wunused-value -Wimplicit  -Wimplicit-function-declaration  -Wimplicit-int -Wimport  -Wunused  -Wunused-function  -Wunused-label -Wno-int-to-pointer-cast -Wbad-function-cast  -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs  -Wold-style-definition -Wstrict-prototypes  -Wdeclaration-after-statement -Wpointer-sign -Wextra -Wredundant-decls -Wunused -Wunused-function -Wunused-parameter -Wunused-value  -Wunused-variable -Wformat  -Wformat-nonliteral -Wparentheses -Wsequence-point -Wuninitialized -Wundef -Wbad-function-cast  $(WARNING_OFF)
-LANG =  -D_GNU_SOURCE $(WARN)   -std=c11
+LANG =  -D_GNU_SOURCE $(WARN)  -std=c11  # -ansi # 
 
 
 ifeq ($(mode),hybrid)
-FEATURES:=$(FEATURES) -D_HYBRID
+FEATURES:=$(FEATURES) -D_HYBRID #  -save-temps
 LFLAGS:=$(LFLAGS) -lpthread
 endif
 
@@ -33,7 +33,7 @@ SRC_EXCLUDE+=%avxLikelihood.c
 endif
 
 CFLAGS:= $(VECT_FLAG) $(OPT) $(LANG) $(FEATURES) 
-DEBUG_CFLAGS := $(VECT_FLAG) $(LANG) $(FEATURES) -ggdb -D_DEBUG
+DEBUG_CFLAGS := $(VECT_FLAG) $(LANG) $(FEATURES) -ggdb -D_DEBUG -fno-inline-small-functions
 
 
 firstTarget : release 

@@ -32,8 +32,7 @@
 #include "axml.h"
 #include "thread.h"
 #include "globalVariables.h"
-
-extern int isThisMyPartition(tree *tr, int model); 
+#include "tree.h"
 
 static const double MNBRAK_GOLD =    1.618034;
 static const double MNBRAK_TINY =      1.e-20;
@@ -1307,9 +1306,6 @@ static void optRatesGeneric(tree *tr, double modelEpsilon, linkageList *ll)
 
 
 
-
-
-
 static int catCompare(const void *p1, const void *p2)
 {
  rateCategorize *rc1 = (rateCategorize *)p1;
@@ -1380,9 +1376,11 @@ static void categorizePartition(tree *tr, rateCategorize *rc, int model, int low
 
 
 
-static void optRateCatPthreads(tree *tr, double lower_spacing, double upper_spacing, double *lhs, int n, int tid)
+static void optRateCatPthreads(tree *tr, double lower_spacing, double upper_spacing, double *lhs)
 {
   int 
+    myAbsRank = ABS_ID(tr->threadId),
+    n = ABS_NUM_RANK(), 
     model;
 
   size_t
@@ -1395,7 +1393,7 @@ static void optRateCatPthreads(tree *tr, double lower_spacing, double upper_spac
      
       for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++)
 	{
-	  if(i % n == (size_t)tid)
+	  if(i % n == myAbsRank)
 	    {
 	      
 	      double 
@@ -1428,10 +1426,7 @@ static void optRateCatPthreads(tree *tr, double lower_spacing, double upper_spac
 		     > leftLH) && 
 		    (fabs(leftLH - v) > epsilon))  
 		{	  
-#ifndef WIN32
-		  if(isnan(v))
-		    assert(0);
-#endif
+		  isnanCheck(&v); 
 		  
 		  leftLH = v;
 		  leftRate = initialRate - k * lower_spacing;
@@ -1443,10 +1438,8 @@ static void optRateCatPthreads(tree *tr, double lower_spacing, double upper_spac
 	      while(((v = evaluatePartialGeneric(tr, localIndex, initialRate + k * upper_spacing, model)) > rightLH) &&
 		    (fabs(rightLH - v) > epsilon))    	
 		{
-#ifndef WIN32
-		  if(isnan(v))
-		    assert(0);
-#endif     
+		  isnanCheck(&v); 
+
 		  rightLH = v;
 		  rightRate = initialRate + k * upper_spacing;	 
 		  k++;
@@ -1508,10 +1501,8 @@ static void optRateCatModel(tree *tr, int model, double lower_spacing, double up
 	     > leftLH) && 
 	    (fabs(leftLH - v) > epsilon))  
 	{	  
-#ifndef WIN32
-	  if(isnan(v))
-	    assert(0);
-#endif
+	  isnanCheck(&v); 
+
 	  
 	  leftLH = v;
 	  leftRate = initialRate - k * lower_spacing;
@@ -1523,10 +1514,8 @@ static void optRateCatModel(tree *tr, int model, double lower_spacing, double up
       while(((v = evaluatePartialGeneric(tr, i, initialRate + k * upper_spacing, model)) > rightLH) &&
 	    (fabs(rightLH - v) > epsilon))    	
 	{
-#ifndef WIN32
-	  if(isnan(v))
-	    assert(0);
-#endif     
+	  isnanCheck(&v); 
+
 	  rightLH = v;
 	  rightRate = initialRate + k * upper_spacing;	 
 	  k++;
@@ -1554,7 +1543,565 @@ static void optRateCatModel(tree *tr, int model, double lower_spacing, double up
 }
 
 
+/* 
+   NOTICE: 
+   set scaleRates to FALSE everywhere such that 
+   per-site rates are not scaled to obtain an overall mean rate 
+   of 1.0
+*/
 
+
+
+
+static void getWeightsForScaler_sub(tree *tr, double* accRat, double* accWgt, int model)
+{
+  if( NOT tr->manyPartitions || isThisMyPartition(tr, model))
+    {
+      int
+	lower = tr->partitionData[model].lower,
+	upper = tr->partitionData[model].upper;
+		  
+      for( int i = lower; i < upper; i++)
+	{
+	  double
+	    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
+		      
+	  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories); 
+	  *accWgt += tr->aliaswgt[i]; 
+	  *accRat += (tr->aliaswgt[i] * rate);
+	}
+    }
+} 
+
+static void getWeightsForScaler(tree *tr, double* accRat, double* accWgt)
+{
+  *accRat = 0.0;
+  *accWgt = 0.0;
+  
+  for(int model = 0 ; model < tr->NumberOfModels; model++)
+    getWeightsForScaler_sub(tr, accRat, accRat, model); 
+}
+
+
+
+
+
+double reduceWgtsYieldScaler(tree *tr, double *accRat, double *dwgt)
+{
+  tr->reductionBuffer[0]  = *accRat;
+  tr->reductionBuffer[1]  = *dwgt;
+
+  HYBRID_ALLREDUCE_VAR(tr, reductionBuffer, 2 , MPI_DOUBLE, double);
+  
+  *accRat = tr->reductionBuffer[0];
+  *dwgt = tr->reductionBuffer[1];
+
+  *accRat /= *dwgt;
+  
+  return 1.0 / (double)*accRat;
+}
+
+
+int fillBufferPartition(tree *tr, const GENERIC_DATA *buf, int absRank, const GENERIC_DATA *valueToExtract)
+{
+  int bufPos = 0; 
+
+  for(int model = 0; model < tr->NumberOfModels ; ++model)
+    {
+      if(isThisHisPartition(tr, model, absRank))
+	{
+	  int width = tr->partitionData[model].upper - tr->partitionData[model].lower ; 
+	  if(valueToExtract != NULL )
+	    {
+	      int start =  tr->partitionData[model].lower; 
+	      g_memcpy(buf, bufPos, valueToExtract, start, width); 
+	    } 
+	  bufPos += width; 
+	}
+    }
+
+  return bufPos; 
+}
+
+
+int fillBufferCyclic(tree *tr, const GENERIC_DATA *buf, int absRank,  const GENERIC_DATA *valueToExtract )
+{
+  size_t 
+    n = ABS_NUM_RANK(); 
+  
+  int 
+    posInBuf = 0, 
+    cnt = 0; 
+
+  for(int model = 0; model < tr->NumberOfModels; ++model)
+    {
+      for(int i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; ++i)
+	{
+	  if(i % n  == absRank)
+	    {
+	      if(valueToExtract != NULL)
+		{
+		  /* :TODO: that's a performance downer =/ */
+		  g_assignElem(buf, posInBuf, valueToExtract, i); 
+		  posInBuf++;
+		}
+	      cnt++; 
+	    }
+	}
+    }
+
+  return cnt; 
+}
+
+
+int fillBuffer(tree *tr, const GENERIC_DATA *buf, int absRank, const GENERIC_DATA *valueToExtract)
+{
+  if(tr->manyPartitions)
+    return fillBufferPartition(tr, buf, absRank, valueToExtract);
+  else 
+    return fillBufferCyclic(tr, buf, absRank, valueToExtract); 
+}
+
+
+
+
+int getNumSitesAssigned(tree *tr, int absRank)
+{
+  if(tr->manyPartitions)
+    return fillBufferPartition(tr, NULL, absRank, NULL);       
+  else 
+    return fillBufferCyclic(tr, NULL, absRank, NULL);   
+}
+
+
+void computeOffsetPerAbsRank(tree *tr, int **lengthsAbs, int **offsetsAbs )
+{
+  *offsetsAbs = calloc(ABS_NUM_RANK(), sizeof(int));   
+  *lengthsAbs = calloc(ABS_NUM_RANK(),sizeof(int) ); 
+  
+  int *oPtr = *offsetsAbs,
+    *lPtr =  *lengthsAbs; 
+
+  for(int model = 0; model < tr->NumberOfModels ; ++model )
+    {
+      int width = tr->partitionData[model].upper - tr->partitionData[model].lower; 
+      lPtr[tr->partitionAssignment[model]] += width;
+    }
+
+  oPtr[0] = 0; 
+  for(int i = 1; i < ABS_NUM_RANK(); ++i)
+      oPtr[i] +=  oPtr[i-1] + lPtr[i-1]; 
+}
+
+
+
+/**
+   @brief a generic function that gathers all values from all
+   processes/threads 
+
+   @param double* srcTargetPtr for target variable
+ */
+static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
+{   
+  int    
+    n = ABS_NUM_RANK(), 
+    *offsetsPerRank= NULL, 
+    *numberPerRank = NULL; 
+  tr->recvBuf = NULL; 
+
+  if(tr->threadId == 0)
+    {
+      /* master needs to know all the offsets */
+      if(ABS_ID(tr->threadId) == 0)
+	{
+	  int
+	    numSoFar = 0; 
+
+	  offsetsPerRank = calloc(mpiState.commSize ,sizeof(int));
+	  numberPerRank = calloc(mpiState.commSize, sizeof(int)); 
+      
+	  for(int i = 0; i < mpiState.commSize; ++i)
+	    {
+	      for(int j = 0 ;j < mpiState.numberOfThreads; ++j)
+		numberPerRank[i] += getNumSitesAssigned(tr, i * mpiState.numberOfThreads + j); 
+
+	      offsetsPerRank[i] = numSoFar; 
+	      numSoFar += numberPerRank[i];
+	    }
+	  
+	  tr->recvBuf = galloc(tr->originalCrunchedLength, gd->aType);
+	}
+
+      int sendCnt = 0; 
+      for(int i = 0; i < mpiState.numberOfThreads; ++i)	
+	sendCnt +=  getNumSitesAssigned(tr, ABS_ID(i));
+
+      tr->sendBuf = galloc(sendCnt , gd->aType); 
+
+      threadBarrier(tr->threadId) ; /* BARRIER 1  */
+      
+      fillBuffer(tr, tr->sendBuf, ABS_ID(tr->threadId), gd); 
+      threadBarrier(tr->threadId); /* BARRIER 2  */
+
+      switch(gd->aType)
+	{
+	case typeDouble:
+	  MPI_Gatherv(tr->sendBuf->value.doubleData, sendCnt, MPI_DOUBLE, ABS_ID(tr->threadId)== 0 ?  tr->recvBuf->value.doubleData : NULL , numberPerRank, offsetsPerRank, MPI_DOUBLE, 0, mpiState.comm);
+	  break; 
+	case typeInt: 
+	  MPI_Gatherv(tr->sendBuf->value.intData, sendCnt, MPI_INT, ABS_ID(tr->threadId)== 0 ?  tr->recvBuf->value.intData : NULL , numberPerRank, offsetsPerRank, MPI_INT, 0, mpiState.comm);
+	  break; 
+	default: assert(0); 
+	}
+
+      g_free(tr->sendBuf);
+      tr->sendBuf = NULL;
+      
+      /* master needs to sort the values back correctly  */
+      if(ABS_ID(tr->threadId) == 0)
+	{
+	  int posInPtr = 0; 
+	  GENERIC_DATA *srcPtr =  tr->recvBuf; 
+
+	  /* =( */
+	  if(tr->manyPartitions)
+	    {
+	      int
+		*offsetsAbs = NULL, 
+		*lengthsAbs = NULL; 
+
+	      computeOffsetPerAbsRank(tr, &lengthsAbs, &offsetsAbs); 
+
+	      for(int model = 0; model < tr->NumberOfModels; ++model)
+		{
+		  int
+		    offset = offsetsAbs[tr->partitionAssignment[model]], 
+		    width = tr->partitionData[model].upper - tr->partitionData[model].lower; 
+
+		  g_memcpy(gd, posInPtr, srcPtr,offset ,  width); 
+		  offsetsAbs[tr->partitionAssignment[model]]  += width; 
+		  posInPtr += width; 
+		}
+
+	      int numSofar  = 0; 
+	      for(int i = 0; i < ABS_NUM_RANK(); ++i )
+		{
+		  numSofar += lengthsAbs[i]; 
+		  assert(offsetsAbs[i] == numSofar); 
+		}
+
+	      free(offsetsAbs); 
+	      free(lengthsAbs); 
+	    }
+	  else 
+	    {
+	      for(int i = 0 ; i < n; ++i)
+		{
+		  int howMany = getNumSitesAssigned(tr, i); 
+		  for(int j = 0; j < howMany; ++j)
+		    g_assignElem(gd, j * n + i , srcPtr, posInPtr++); 
+		} 
+	    }
+
+	  assert(posInPtr == tr->originalCrunchedLength); 
+
+	  g_free(tr->recvBuf); 
+	  free(offsetsPerRank); 
+	  free(numberPerRank); 
+	}
+    }
+  else
+    {
+      int myOffset =  0; 
+      for(int i = 0; i < tr->threadId; ++i)
+	myOffset += getNumSitesAssigned(tr, ABS_ID(i)); 
+
+      threadBarrier(tr->threadId); /* BARRIER 1  */
+
+      GENERIC_DATA myGD; 
+      myGD.aType = gd->aType; 
+      switch(myGD.aType)
+	{
+	case typeDouble: 
+	  myGD.value.doubleData = MASTER_TREE->sendBuf->value.doubleData  + myOffset; 
+	  break; 
+	case typeInt: 
+	  myGD.value.intData = MASTER_TREE->sendBuf->value.intData + myOffset; 
+	  break; 
+	default: assert(0); 
+	}      
+
+      fillBuffer(tr, &myGD, ABS_ID(tr->threadId), gd);
+      threadBarrier(tr->threadId); /* BARRIER 2  */
+    } 
+}
+
+
+static void gatherRatesManyPartitions(tree *tr)
+{  
+  GENERIC_DATA gd; 
+  
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->patrat;   
+  gatherVariableForAssignedSites(tr, &gd); 
+
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->patratStored; 
+  gatherVariableForAssignedSites(tr,&gd); 
+
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->lhs ; 
+  gatherVariableForAssignedSites(tr, &gd); 
+
+  gd.aType = typeInt; 
+  gd.value.intData = tr->rateCategory; 
+  gatherVariableForAssignedSites(tr, &gd); 
+
+
+  /* TODO just coding this manually now  */
+  /* every thread adds their stuff to the buffer
+     in the end, the master rank figures out correct assignments 
+   */  
+  if(tr->threadId == 0)
+    {
+      int 
+	*lengths = NULL, 
+	*offsets = NULL ; 
+      double *recvBuf = NULL; 
+      if(ABS_ID(tr->threadId) == 0 )    
+	{
+	  /* master additionally needs to figure out the offsesets */
+	  lengths = calloc(mpiState.commSize, sizeof(int)); 
+	  offsets = calloc(mpiState.commSize, sizeof(int)); 
+	  
+	  recvBuf = calloc(tr->NumberOfModels * tr->maxCategories, sizeof(double)); 
+
+	  for(int model = 0; model < tr->NumberOfModels; ++model)	    
+	    {
+	      int num = tr->partitionAssignment[model] / mpiState.numberOfThreads; 
+	      assert(num < mpiState.commSize);
+	      lengths[num] += tr->maxCategories;
+	    }
+
+	  offsets[0] = 0; 
+	  for(int i = 1; i < mpiState.commSize; ++i)
+	    offsets[i] = offsets[i-1]+ lengths[i-1]; 
+	}
+
+      int numPart = 0; 
+      for(int model = 0; model < tr->NumberOfModels; ++model )	
+	for(int j = 0; j < mpiState.numberOfThreads; ++j) 
+	  if(isThisHisPartition(tr, model, ABS_ID(j)))
+	    numPart++; 
+    
+       tr->TMP = (double*)calloc(numPart * tr->maxCategories, sizeof(double)); 
+       threadBarrier(tr->threadId); 
+
+       double *start = MASTER_TREE->TMP; 
+       for(int model = 0, ctr = 0; model < tr->NumberOfModels; ++model)
+	 {
+	   if(isThisMyPartition(tr, model))
+	     {
+	       memcpy(start + (ctr * tr->maxCategories), tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories); 
+	       ctr++; 
+	     }
+	 }
+       
+       /* communicate  */
+       MPI_Gatherv(tr->TMP, numPart * tr->maxCategories, MPI_DOUBLE, recvBuf, lengths, offsets, MPI_DOUBLE , 0, mpiState.comm );
+       
+       if(ABS_ID(tr->threadId) == 0)
+	 {
+	   int bufPos = 0; 
+	   /* master writes back the stuff he just received  */
+	   for(int i = 0; i < ABS_NUM_RANK(); ++i)
+	     {
+	       for(int model = 0; model < tr->NumberOfModels; ++model )
+		 {
+		   if(isThisHisPartition(tr, model,i))
+		     {
+		       memcpy(tr->partitionData[model].perSiteRates, tr->TMP + bufPos ,sizeof(double) * tr->maxCategories); 
+		       bufPos += tr->maxCategories ; 
+		     }
+		   
+		 }
+	     }
+	   assert(bufPos == tr->maxCategories * tr->NumberOfModels); 
+
+	   free(lengths); 
+	   free(recvBuf); 
+	   free(offsets); 
+	 } 
+       
+       threadBarrier(tr->threadId); 
+       free(tr->TMP); 
+    }
+  else 
+    {
+      threadBarrier(tr->threadId); 
+      
+      int myOffset = 0; 
+      for(int model = 0; model < tr->NumberOfModels; ++model)
+	for(int j = 0; j < tr->threadId; ++j)
+	  if(isThisHisPartition(tr, model, ABS_ID(j)))
+	    myOffset++;
+      double *start = MASTER_TREE->TMP + (myOffset * tr->maxCategories) ;       
+      for(int model = 0, ctr = 0; model < tr->NumberOfModels; ++model)
+	{
+	  if(isThisMyPartition(tr, model))
+	    {
+	      memcpy(start + (ctr * tr->maxCategories), tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories); 
+	      ctr++; 
+	    }
+	}
+      threadBarrier(tr->threadId); 
+
+    }  
+  /* :TODO: the following is sub-optimal */
+}
+
+
+static void gatherRatesFewPartitions(tree *tr)
+{
+  GENERIC_DATA gd; 
+
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->patrat;   
+  gatherVariableForAssignedSites(tr, &gd); 
+
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->patratStored; 
+  gatherVariableForAssignedSites(tr,&gd); 
+
+  gd.aType = typeDouble; 
+  gd.value.doubleData = tr->lhs ; 
+  gatherVariableForAssignedSites(tr, &gd); 
+}
+
+
+/* :TODO: replace master/worker scheme here  */
+static void broadcastRatesFewPartitions(tree *tr)
+{ 
+  int 
+    model;
+
+  size_t
+    n = (size_t)ABS_NUM_RANK();
+  
+  HYBRID_BCAST_VAR(tr, patrat, tr->originalCrunchedLength, MPI_DOUBLE, double); 
+  HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
+
+  for(model = 0; model < tr->NumberOfModels; model++)
+    { 
+      HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
+      HYBRID_BCAST_VAR(tr, partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories,MPI_DOUBLE, double); 
+    }
+
+  HYBRID_BCAST_VAR(tr, rateCategory, tr->originalCrunchedLength, MPI_INT, int); 
+  HYBRID_BCAST_VAR(tr, wr, tr->originalCrunchedLength, MPI_DOUBLE, double); 
+  HYBRID_BCAST_VAR(tr, wr2, tr->originalCrunchedLength,MPI_DOUBLE, double); 
+
+  for(model = 0; model < tr->NumberOfModels; model++)
+    {
+      size_t
+	i,
+	localCounter;
+
+      for(localCounter = 0, i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++)
+	{
+	  if(i % n == ABS_ID(tr->threadId))
+	    {		 
+	      tr->partitionData[model].rateCategory[localCounter] = tr->rateCategory[i];
+	      tr->partitionData[model].wr[localCounter]             = tr->wr[i];
+	      tr->partitionData[model].wr2[localCounter]            = tr->wr2[i];		 
+
+	      localCounter++;
+	    }
+	}
+    }
+}
+
+
+static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
+{  
+  if(tr->numBranches > 1)
+    {        
+      for(int model = 0; model < tr->NumberOfModels; model++)
+	{
+	  double 
+	    scaler = 0.0,       
+	    accWgt = 0.0, 
+	    accRat = 0.0; 
+
+	  getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
+
+	  if(scaleRates)
+	    {
+	      accRat /= ((double)accWgt);	      
+	      scaler = 1.0 / ((double)accRat);
+	      
+	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		tr->partitionData[model].perSiteRates[i] *= scaler;	    
+	      
+	      accRat = 0.0;	 
+	      accWgt = 0.0; 
+	      getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
+	    }	         
+	  accRat /= ((double)accWgt); 
+	  assert(ABS(1.0 - accRat) < 1.0E-5);
+	}
+    }
+  else
+    {
+      double 
+	accWgt = 0.0,
+	scaler = 0.0,       
+	accRat = 0.0; 
+      
+      getWeightsForScaler(tr, &accRat, &accWgt) ;
+
+      accRat /= ((double)accWgt);	  
+
+      if(scaleRates)
+	{
+	  scaler = 1.0 / ((double)accRat);
+	  
+	  for(int model = 0; model < tr->NumberOfModels; model++)
+	    {
+	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		tr->partitionData[model].perSiteRates[i] *= scaler;
+	    }
+	  
+	  getWeightsForScaler(tr, &accRat, &accWgt); 	  
+	  accRat /= ((double)accWgt);	  	  
+	}
+      assert(ABS(1.0 - accRat) < 1.0E-5);
+    }
+      
+  for(int model = 0; model < tr->NumberOfModels; model++)
+    {
+      int 	    
+	lower = tr->partitionData[model].lower,
+	upper = tr->partitionData[model].upper;
+      
+      for(int i = lower; i < upper; i++)
+	{
+	  double
+	    w = ((double)tr->aliaswgt[i]);	      
+	  
+	  double
+	    wtemp,
+	    temp = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
+	  
+	  wtemp = temp * w;
+	  
+	  tr->wr[i]  = wtemp;
+	  tr->wr2[i] = temp * wtemp;
+	}
+    } 
+  
+  broadcastRatesFewPartitions(tr);
+}
 
 
 
@@ -1564,247 +2111,28 @@ static void optRateCatModel(tree *tr, int model, double lower_spacing, double up
    of 1.0
 */
 
-static size_t calcSendBufferSize(tree *tr, int tid)
-{
-  size_t 
-    length = 0;
-
-  int 
-    model;  
-
-  for(model = 0; model < tr->NumberOfModels; model++)
-      length += ((size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower);            
-
-  return length;
-}
-
-
-
-static void gatherCatsWorker(tree *tr, int tid)
-{  
-  size_t 
-    model,   
-    sendBufferSize = calcSendBufferSize(tr, tid);
-
-  int   
-    *catBufSend = (int *)malloc(sendBufferSize * sizeof(int));
-
-  double 
-    *rateBufSend = (double *)malloc(sendBufferSize * sizeof(double)),
-    *patBufSend = (double *)malloc(sendBufferSize * sizeof(double)),
-    *patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)),
-    *lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double));
-
-  size_t
-    offsets = 0; 
-
-  for(model = 0, offsets = 0; model < (size_t)tr->NumberOfModels; model++)
-    {               	
-      size_t
-	start = (size_t)tr->partitionData[model].lower,
-	width = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;
-      
-      if(isThisMyPartition(tr, model))
-	{ 
-	  memcpy(&catBufSend[offsets],       &tr->rateCategory[start], sizeof(int) * width);
-	  memcpy(&rateBufSend[offsets],      tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories);
-	  memcpy(&patBufSend[offsets],       &tr->patrat[start],       sizeof(double) * width);
-	  memcpy(&patStoredBufSend[offsets], &tr->patratStored[start], sizeof(double) * width);
-	  memcpy(&lhsBufSend[offsets],       &tr->lhs[start],          sizeof(double) * width);
-	  
-	  offsets += width;	  
-	} 
-    }
-  
-  int mpiErr = MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    (int*)NULL, (int*)NULL, (int*)NULL, MPI_INT,    0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, (double*)NULL, (int*)NULL, (int*)NULL, MPI_DOUBLE, 0, mpiState.comm);
-
-  if(mpiErr != MPI_SUCCESS)
-    {
-      puts("not implemented."); 
-      assert(0); 
-    }    
-  
-  free(catBufSend);
-  free(rateBufSend);
-  free(patBufSend);
-  free(patStoredBufSend);
-  free(lhsBufSend);
-}
-
-
-static void gatherCatsMaster(tree *tr, int tid, int n)
-{
-  int  
-    offsets = 0,
-    *countArray  = (int *)calloc(n, sizeof(int)),
-    *offsetArray = (int *)calloc(n, sizeof(int)),
-    *modelOffsets = (int *)calloc(tr->NumberOfModels, sizeof(int)), 
-    i,
-    p;
-  
-  size_t
-    model,
-    sendBufferSize = calcSendBufferSize(tr, tid),
-    recvBufferSize = (size_t)tr->originalCrunchedLength;
-
-  int   
-    *catBufSend = (int *)malloc(sendBufferSize * sizeof(int)),
-    *catBufRecv = (int *)malloc(recvBufferSize * sizeof(int));
-
-  double   
-    *rateBufSend =       (double *)malloc(sendBufferSize * sizeof(double)),   
-    *patBufSend =        (double *)malloc(sendBufferSize * sizeof(double)),
-    *patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)),
-    *lhsBufSend =        (double *)malloc(sendBufferSize * sizeof(double)),
-    
-     *rateBufRecv =      (double *)malloc(recvBufferSize * sizeof(double)),
-    *patBufRecv =        (double *)malloc(recvBufferSize * sizeof(double)),
-    *patStoredBufRecv =  (double *)malloc(recvBufferSize * sizeof(double)),
-    *lhsBufRecv =        (double *)malloc(recvBufferSize * sizeof(double));
-
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    countArray[tr->partitionAssignment[model]] += (int)(tr->partitionData[model].upper - tr->partitionData[model].lower);
-
-  for(i = 0, offsets = 0; i < n; i++)
-    {
-      offsetArray[i] = offsets;
-      offsets += countArray[i];
-    }
-
-  for(p = 0; p < n; p++)    
-    {
-      int
-	localOffset = 0,
-	globalOffset = offsetArray[p];
-      
-      for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-	if(tr->partitionAssignment[model] == p)
-	  {
-	    modelOffsets[model] = globalOffset + localOffset;
-	    localOffset += (tr->partitionData[model].upper - tr->partitionData[model].lower);
-	  }
-    }
-
-
-  assert((size_t)offsets == recvBufferSize); 
-
-  for(model = 0, offsets = 0; model < (size_t)tr->NumberOfModels; model++)
-    {               	        
-      size_t       
-	start = (size_t)tr->partitionData[model].lower,
-	width = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;
-      
-      if(isThisMyPartition(tr, model))
-	{		  	  
-	  memcpy(&catBufSend[offsets],       &tr->rateCategory[start], sizeof(int)    * width);
-	  memcpy(&rateBufSend[offsets],      tr->partitionData[model].perSiteRates, sizeof(double) * tr->maxCategories);
-	  memcpy(&patBufSend[offsets],       &tr->patrat[start],       sizeof(double) * width);
-	  memcpy(&patStoredBufSend[offsets], &tr->patratStored[start], sizeof(double) * width);
-	  memcpy(&lhsBufSend[offsets],       &tr->lhs[start],          sizeof(double) * width);	 
-
-	  offsets += width; 	 	 
-	}	      
-    }
-  
-  int mpiErr = MPI_Gatherv(catBufSend,       sendBufferSize, MPI_INT,    catBufRecv,       countArray, offsetArray, MPI_INT,    0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(rateBufSend,      sendBufferSize, MPI_DOUBLE, rateBufRecv,      countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |=  MPI_Gatherv(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);
-  mpiErr |= MPI_Gatherv(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       countArray, offsetArray, MPI_DOUBLE, 0, mpiState.comm);	
-  if(mpiErr != MPI_SUCCESS)
-    {
-      puts("not implemented."); 
-      assert(0); 
-    }
-
-  for(model = 0; model < (size_t)tr->NumberOfModels; model++)
-    {        
-      size_t
-	start  = (size_t)tr->partitionData[model].lower,
-	width  = (size_t)tr->partitionData[model].upper - (size_t)tr->partitionData[model].lower;            
-      
-      memcpy(&tr->rateCategory[start], &catBufRecv[modelOffsets[model]],       sizeof(int) * width);
-      memcpy(tr->partitionData[model].perSiteRates,       &rateBufRecv[modelOffsets[model]],       sizeof(double) * tr->maxCategories);
-      memcpy(&tr->patrat[start],       &patBufRecv[modelOffsets[model]],       sizeof(double) * width);
-      memcpy(&tr->patratStored[start], &patStoredBufRecv[modelOffsets[model]], sizeof(double) * width);
-      memcpy(&tr->lhs[start],          &lhsBufRecv[modelOffsets[model]],       sizeof(double) * width); 
-      
-      {	
-	int 	  
-	  *numCAT = (int *)calloc(tr->maxCategories, sizeof(int)),	 
-	  numCats = 0;
-
-	size_t
-	  k;
-
-	for(k = tr->partitionData[model].lower; k < tr->partitionData[model].upper; k++)
-	  numCAT[tr->rateCategory[k]] = 1;
-
-	for(k = 0; k < (size_t)tr->maxCategories; k++)
-	  if(numCAT[k] == 1)
-	    numCats++;
-	
-	if(isThisMyPartition(tr,  model))
-	  assert(tr->partitionData[model].numberOfCategories == numCats);
-
-	tr->partitionData[model].numberOfCategories = numCats;
-       
-	free(numCAT);
-      }
-
-    }
-
-
-  free(modelOffsets);
-  free(countArray);
-  free(offsetArray);
- 
-  free(catBufSend);
-  free(rateBufSend);
-  free(patBufSend);
-  free(patStoredBufSend);
-  free(lhsBufSend);
-
-  free(catBufRecv);
-  free(rateBufRecv);
-  free(patBufRecv);
-  free(patStoredBufRecv);
-  free(lhsBufRecv);
-}
-
-
 
 static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 {
-  int 
-    i,
-    model; 
+  double 
+    accWgt = 0.0,
+    scaler = 0.0 ,
+    accRat = 0.0 ; 
 
   if(tr->numBranches > 1)
-    {            
-      for(model = 0; model < tr->NumberOfModels; model++)
+    { 
+      for(int model = 0; model < tr->NumberOfModels; model++)
 	{
 	  if(isThisMyPartition(tr,  model))
 	    {
 	      int 	       
 		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper,	      
-		localCount = 0;
+		upper = tr->partitionData[model].upper; 
+
 	      
 	      if(scaleRates)
-		{
-		  double 
-		    scaler = 0.0,       
-		    accRat = 0.0; 
-		  
-		  int 
-		    accWgt     = 0;
-		  
-		  for(i = lower; i < upper; i++)
+		{		  
+		  for(int i = lower; i < upper; i++)
 		    {
 		      int 
 			w = tr->aliaswgt[i];
@@ -1823,12 +2151,12 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 		  
 		  scaler = 1.0 / ((double)accRat);
 	  	  
-		  for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		  for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
 		    tr->partitionData[model].perSiteRates[i] *= scaler;	    
 		  
 		  accRat = 0.0;	 
 		  
-		  for(i = lower; i < upper; i++)
+		  for(int i = lower; i < upper; i++)
 		    {
 		      int 
 			w = tr->aliaswgt[i];
@@ -1853,7 +2181,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 		  int 
 		    accWgt     = 0;
 		  
-		  for(i = lower; i < upper; i++)
+		  for(int i = lower; i < upper; i++)
 		    {
 		      int 
 			w = tr->aliaswgt[i];
@@ -1873,7 +2201,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 		  assert(ABS(1.0 - accRat) < 1.0E-5);
 		}
 	      
-	      for(i = lower; i < upper; i++)
+	      for(int i = lower; i < upper; i++)
 		{
 		  double
 		    w = ((double)tr->aliaswgt[i]);	      
@@ -1886,187 +2214,50 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 		  
 		  tr->wr[i]  = wtemp;
 		  tr->wr2[i] = temp * wtemp;
-		}	            	  	  	      
+		} 
 	
 	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
+	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
 		{	    	      
 		  tr->partitionData[model].wr[localCount]  = tr->wr[i];
 		  tr->partitionData[model].wr2[localCount] = tr->wr2[i];
 		  tr->partitionData[model].rateCategory[localCount] = tr->rateCategory[i];		
 		}	      
-	    }	 
+	    } 
 	}
     }
   else
     {
-      int
-	accWgt = 0;
+      getWeightsForScaler(tr, &accRat, &accWgt); 
+      scaler =  reduceWgtsYieldScaler(tr, &accRat, &accWgt); 
 
-      double 
-	scaler = 0.0,       
-	accRat = 0.0,
-	dwgt,
-	a[2],
-	r[2];
-      
       if(scaleRates)
 	{
-	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
-	    {
-	      if(isThisMyPartition(tr, model))
-		{
-		  int 
-		    localCount = 0,
-		    lower = tr->partitionData[model].lower,
-		    upper = tr->partitionData[model].upper;
-		  
-		  for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		      
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		      
-		      accWgt += w;
-		      
-		      accRat += (w * rate);
-		    }
-		}
-	    }
-	  	  	    	      
-	  a[0] = (double)accRat;
-	  a[1] = (double)accWgt;
-
-	  int mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
-	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
-	  if(mpiErr != MPI_SUCCESS)
-	    {
-	      puts("not implemented."); 
-	      assert(0); 
-	    }
-	      
-	  accRat = r[0];
-	  dwgt   = r[1];
-	  
-	  accRat /= dwgt;	     	    
-	 	  
-	  scaler = 1.0 / ((double)accRat);
-
-	  for(model = 0; model < tr->NumberOfModels; model++)
+	  /* the scaling itself  */
+	  for(int model = 0; model < tr->NumberOfModels; model++)
 	    {
 	      if(isThisMyPartition(tr,  model))
 		{
-		  for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		  for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
 		    tr->partitionData[model].perSiteRates[i] *= scaler;
 		}
 	    }
 
-	  for(model = 0, accRat = 0.0; model < tr->NumberOfModels; model++)
-	    {
-	      if(isThisMyPartition(tr, model))
-		{
-		  int 
-		    localCount = 0,
-		    lower = tr->partitionData[model].lower,
-		    upper = tr->partitionData[model].upper;
-		  
-		  for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		      
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);	      
-		      
-		      accRat += (w * rate);
-		    }
-		}
-	    }           
-	
-	 
-	  a[0] = (double)accRat;
-	  a[1] = (double)accWgt;
-	  
-	  mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
-	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
-	  if(mpiErr != MPI_SUCCESS)
-	    {
-	      puts("not implemented."); 
-	      assert(0); 
-	    }
-	  
-	  accRat = r[0];
-	  dwgt   = r[1];
-	  
-	  accRat /= dwgt;	     	     		  
+	  getWeightsForScaler(tr, &accRat, &accWgt); 
+	  reduceWgtsYieldScaler(tr, &accRat, &accWgt); 
 
-	  assert(ABS(1.0 - accRat) < 1.0E-5);
 	}
-      else
-	{
-	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
-	    {
-	      if(isThisMyPartition(tr, model))
-		{
-		  int 
-		    localCount = 0,
-		    lower = tr->partitionData[model].lower,
-		    upper = tr->partitionData[model].upper;
-		  
-		  for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];		      		      
-
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		      
-		      accWgt += w;
-		      
-		      accRat += (w * rate);
-		    }
-		}
-	    }
-	  
-	   
-
-	  a[0] = (double)accRat;
-	  a[1] = (double)accWgt;
-	  
-	  int mpiErr = MPI_Reduce(a, r, 2, MPI_DOUBLE, MPI_SUM, 0, mpiState.comm);
-	  mpiErr |= MPI_Bcast(r, 2, MPI_DOUBLE, 0, mpiState.comm);
-	  if(mpiErr != MPI_SUCCESS)
-	    {
-	      puts("not implemented."); 
-	      assert(0); 
-	    }
-	  
-	  accRat = r[0];
-	  dwgt   = r[1];
-	  
-	  accRat /= dwgt;	     
-	 
-	  assert(ABS(1.0 - accRat) < 1.0E-5);
-	}
+      assert(ABS(1.0 - accRat) < 1.0E-5);
       
-       for(model = 0; model < tr->NumberOfModels; model++)
+      for( int model = 0; model < tr->NumberOfModels; model++)
 	{
 	  if(isThisMyPartition(tr,  model))
 	    {
 	      int 
-		localCount = 0,
 		lower = tr->partitionData[model].lower,
 		upper = tr->partitionData[model].upper;
 	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
+	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
 		{
 		  double
 		    w = ((double)tr->aliaswgt[i]);	      
@@ -2083,16 +2274,15 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	    }
 	}         
 
-      for(model = 0; model < tr->NumberOfModels; model++)
+      for(int model = 0; model < tr->NumberOfModels; model++)
 	{  
 	  if(isThisMyPartition(tr, model))
 	    {
 	      int 
-		localCount,
 		lower = tr->partitionData[model].lower,
 		upper = tr->partitionData[model].upper;	  
 	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
+	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
 		{	    	      
 		  tr->partitionData[model].wr[localCount]  = tr->wr[i];
 		  tr->partitionData[model].wr2[localCount] = tr->wr2[i];
@@ -2102,535 +2292,9 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
 	}
     }  
 
-  if(mpiState.rank == 0)    
-    gatherCatsMaster(tr, mpiState.rank, mpiState.commSize);    
-  else    
-    gatherCatsWorker(tr, mpiState.rank);    
+  gatherRatesManyPartitions(tr);
 }
 
-
-
-int getNumSitesForHybridCyclic(tree *tr, int absRank)
-{
-  size_t
-    n = ABS_NUM_RANK; 
-
-  int
-    cnt = 0,
-    i,
-    model = 0; 
-
-  for(model = 0, cnt = 0; model < tr->NumberOfModels; ++model)
-    {
-      for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; ++i)
-	if(i %  n == absRank)
-	  ++cnt; 
-    }
-  return cnt; 
-}
-
-
-
-int fillBufferCyclic(tree *tr, double *buf, int absRank, double *valueToExtract )
-{
-  size_t 
-    n = ABS_NUM_RANK; 
-  double
-    *bufPtr = buf; 
-  
-  int cnt = 0,
-    i,
-    model = 0; 
-  
-  for(model = 0, cnt = 0; model < tr->NumberOfModels; ++model)
-    {
-      for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; ++i)
-	if(i % n  == absRank)
-	  {
-	    *bufPtr = valueToExtract[i]; 
-	    bufPtr++;  
-	    cnt++; 
-	  }
-    }
-
-  return cnt; 
-}
-
-
-static void gatherRatesFewPartitionsHelper(tree *tr, double *srcTargetPtr)
-{  
-  int    
-    n = ABS_NUM_RANK, 
-    i = 0,  
-    *offsetsPerRank= NULL, 
-    *numberPerRank = NULL; 
-
-  if(tr->threadId == 0)
-    {
-      /* master needs to know all the offsets */
-      if(ABS_ID(tr) == 0)
-	{
-	  int
-	    numSoFar = 0; 
-
-	  offsetsPerRank = calloc(mpiState.commSize ,sizeof(int));
-	  numberPerRank = calloc(mpiState.commSize, sizeof(int)); 
-      
-	  for(i = 0; i < n; ++i)
-	    {
-	      numberPerRank[i] = getNumSitesForHybridCyclic(tr, i); 
-	      offsetsPerRank[i] = numSoFar; 
-	      numSoFar += numberPerRank[i]; 
-	    }
-	}
-
-      int sendCnt = 0; 
-
-      for(i = 0; i < mpiState.numberOfThreads; ++i)	
-	sendCnt += getNumSitesForHybridCyclic(tr, mpiState.rank * mpiState.numberOfThreads + i); 
-      
-      tr->sendBuf = calloc(sendCnt,sizeof(double)); 
-      threadBarrier(tr->threadId) ; 
-      
-      double *buf = mpiState.allTrees[0]->sendBuf; 
-      fillBufferCyclic(tr, buf, ABS_ID(tr), srcTargetPtr); 
-      threadBarrier(tr->threadId);
-
-      if(ABS_ID(tr) == 0) 	
-	tr->recvBuf = calloc(tr->originalCrunchedLength,sizeof(double)); 
-
-      MPI_Gatherv(buf, sendCnt, MPI_DOUBLE, tr->recvBuf, numberPerRank, offsetsPerRank, MPI_DOUBLE, 0, mpiState.comm);
-      
-      threadBarrier(tr->threadId);
-
-      /* master needs to sort the values back correctly  */
-      if(ABS_ID(tr) == 0)
-	{
-	  int j,
-	    cnt = 0; 
-	  double *srcPtr = tr->recvBuf; 
-
-	  for(i = 0 ; i < n; ++i)
-	    {
-	      int howMany =  getNumSitesForHybridCyclic(tr, i); 
-	      for(j = 0; j < howMany; ++j)
-		{
-		  srcTargetPtr[ j * n + i  ]  = *srcPtr; 
-		  srcPtr++; 
-		  cnt++; 
-		}
-	    }
-	  
-	  assert(cnt == tr->originalCrunchedLength); 
-
-	  free(offsetsPerRank); 
-	  free(numberPerRank); 
-	}
-    }
-  else
-    {
-      int myOffset =  0; 
-      for(i = 0; i < tr->threadId; ++i)
-	myOffset += getNumSitesForHybridCyclic(tr, mpiState.rank * mpiState.numberOfThreads + i); 
-      
-      threadBarrier(tr->threadId); 
-
-      double
-	*buf =  mpiState.allTrees[0]->sendBuf + myOffset; 
-      
-      fillBufferCyclic(tr, buf, ABS_ID(tr), srcTargetPtr); 
-
-      threadBarrier(tr->threadId);      
-
-      threadBarrier(tr->threadId);
-    } 
-}
-
-
-/* TODO does this work???  */
-static void gatherRatesFewPartitions(tree *tr)
-{
-  gatherRatesFewPartitionsHelper(tr, tr->patrat); 
-  gatherRatesFewPartitionsHelper(tr, tr->patratStored); 
-  gatherRatesFewPartitionsHelper(tr, tr->lhs); 
-}
-
-
-/* all this function does, is gather tr->patrat tr->patratStored,
-   tr->lhs in the master */
-/* static void gatherRatesFewPartitions(tree *tr, int tid) */
-/* { */
-/*   size_t */
-/*     n = ABS_NUM_RANK; */
-
-/*   if(ABS_ID(tr) == 0) */
-/*     { */
-/*       int */
-/* 	model; */
-
-/*       size_t */
-/* 	localCounter, */
-/* 	i, */
-/* 	sendBufferSize = (tr->originalCrunchedLength / n) + 1, */
-/* 	recvBufferSize = sendBufferSize * n; */
-
-/*         double */
-/*           *patBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
-/*           *patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)), */
-/*           *lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
-/*           *patBufRecv = (double *)malloc(recvBufferSize * sizeof(double)), */
-/*           *patStoredBufRecv =  (double *)malloc(recvBufferSize * sizeof(double)), */
-/*           *lhsBufRecv = (double *)malloc(recvBufferSize * sizeof(double)); */
-
-/*         for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++) */
-/* 	  { */
-/* 	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++) */
-/* 	      if(i % n == (size_t)tid) */
-/* 		{ */
-/* 		  patBufSend[localCounter] = tr->patrat[i]; */
-/* 		  patStoredBufSend[localCounter] = tr->patratStored[i]; */
-/* 		  lhsBufSend[localCounter] = tr->lhs[i]; */
-/* 		  localCounter++; */
-/* 		} */
-/* 	  } */
-
-/*         int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, patBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/*         mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, patStoredBufRecv, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/*         mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, lhsBufRecv,       sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/* 	if(mpiErr != MPI_SUCCESS) */
-/* 	  { */
-/* 	    puts("not implemented."); */
-/* 	    assert(0); */
-/* 	  } */
-
-/*         for(model = 0; model < tr->NumberOfModels; model++) */
-/* 	  { */
-/* 	    for(i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++) */
-/* 	      { */
-/* 		int */
-/* 		  offset = i % n, */
-/* 		  position = i / n; */
-		
-/* 		tr->patrat[i]       = patBufRecv[offset * sendBufferSize + position]; */
-/* 		tr->patratStored[i] = patStoredBufRecv[offset * sendBufferSize + position]; */
-/* 		tr->lhs[i]                = lhsBufRecv[offset * sendBufferSize + position]; */
-/* 	      } */
-/* 	  } */
-
-/*         free(patBufSend); */
-/*         free(patStoredBufSend); */
-/*         free(lhsBufSend); */
-/*         free(patBufRecv); */
-/*         free(patStoredBufRecv); */
-/*         free(lhsBufRecv); */
-/*     } */
-/*   else */
-/*     { */
-/*       int */
-/* 	model; */
-      
-/*       size_t */
-/* 	i, */
-/* 	localCounter, */
-/* 	sendBufferSize = (tr->originalCrunchedLength / n) + 1; */
-      
-/*       double */
-/* 	*localDummy = (double*)NULL, */
-/* 	*patBufSend = (double *)malloc(sendBufferSize * sizeof(double)), */
-/* 	*patStoredBufSend =  (double *)malloc(sendBufferSize * sizeof(double)), */
-/* 	*lhsBufSend = (double *)malloc(sendBufferSize * sizeof(double)); */
-      
-/*       for(model = 0, localCounter = 0; model < tr->NumberOfModels; model++) */
-/* 	{ */
-/* 	  for(i = tr->partitionData[model].lower; i < tr->partitionData[model].upper; i++) */
-/* 	    if(i % n == (size_t)tid) */
-/* 	      { */
-/* 		patBufSend[localCounter] = tr->patrat[i]; */
-/* 		patStoredBufSend[localCounter] = tr->patratStored[i]; */
-/* 		lhsBufSend[localCounter] = tr->lhs[i]; */
-/* 		localCounter++; */
-/* 	      } */
-/* 	} */
-      
-/*       int mpiErr = MPI_Gather(patBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/*       mpiErr |= MPI_Gather(patStoredBufSend, sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/*       mpiErr |= MPI_Gather(lhsBufSend,       sendBufferSize, MPI_DOUBLE, localDummy, sendBufferSize, MPI_DOUBLE, 0, mpiState.comm); */
-/*       if(mpiErr != MPI_SUCCESS) */
-/* 	{ */
-/* 	  puts("not implemented."); */
-/* 	  assert(0); */
-/* 	} */
-      
-/*       free(patBufSend); */
-/*       free(patStoredBufSend); */
-/*       free(lhsBufSend); */
-/*     } */
-/* } */
-
-
-
-/* :TODO: replace master/worker scheme here  */
-static void broadcastRatesFewPartitions(tree *tr, int tid)
-{ 
-  int 
-    model;
-
-  size_t n =  (size_t)ABS_NUM_RANK;
-  
-  HYBRID_BCAST_VAR(tr, patrat, tr->originalCrunchedLength, MPI_DOUBLE, double); 
-  HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
-
-  for(model = 0; model < tr->NumberOfModels; model++)
-    { 
-      HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
-      HYBRID_BCAST_VAR(tr, partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories,MPI_DOUBLE, double); 
-    }
-
-  HYBRID_BCAST_VAR(tr, rateCategory, tr->originalCrunchedLength, MPI_INT, int); 
-  HYBRID_BCAST_VAR(tr, wr, tr->originalCrunchedLength, MPI_DOUBLE, double); 
-  HYBRID_BCAST_VAR(tr, wr2, tr->originalCrunchedLength,MPI_DOUBLE, double); 
-
-  for(model = 0; model < tr->NumberOfModels; model++)
-    {
-      size_t
-	i,
-	localCounter;
-
-      for(localCounter = 0, i = tr->partitionData[model].lower;  i < tr->partitionData[model].upper; i++)
-	{
-	  if(i % n == (size_t)tid)
-	    {		 
-	      tr->partitionData[model].rateCategory[localCounter] = tr->rateCategory[i];
-	      tr->partitionData[model].wr[localCounter]             = tr->wr[i];
-	      tr->partitionData[model].wr2[localCounter]            = tr->wr2[i];		 
-
-	      localCounter++;
-	    }
-	}
-    }
-
-}
-
-
-static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
-{  
-  int 
-    i,
-    model;
-
-  /*gatherRatesFewPartitions(tr, mpiState.rank);*/
-  
-  if(tr->numBranches > 1)
-    {  
-      for(model = 0; model < tr->NumberOfModels; model++)
-	{
-	  int 	       
-	    lower = tr->partitionData[model].lower,
-	    upper = tr->partitionData[model].upper;
-
-	  if(scaleRates)
-	    {
-	      double 
-		scaler = 0.0,       
-		accRat = 0.0; 
-	      
-	      int 
-		accWgt     = 0;
-	      
-	      for(i = lower; i < upper; i++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		  
-		  accWgt += w;
-		  
-		  accRat += (w * rate);
-		}	   
-	      
-	      accRat /= ((double)accWgt);
-	      
-	      scaler = 1.0 / ((double)accRat);
-	      
-	      for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
-		tr->partitionData[model].perSiteRates[i] *= scaler;	    
-	      
-	      accRat = 0.0;	 
-	      
-	      for(i = lower; i < upper; i++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);	      
-		  
-		  accRat += (w * rate);
-		}	         
-	      
-	      accRat /= ((double)accWgt);	  
-	      
-	      assert(ABS(1.0 - accRat) < 1.0E-5);
-	    }
-	  else
-	    {
-	      double 		   
-		accRat = 0.0; 
-	      
-	      int 
-		accWgt     = 0;
-	      
-	      for(i = lower; i < upper; i++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		  
-		  accWgt += w;
-		  
-		  accRat += (w * rate);
-		}	   
-	      
-	      accRat /= ((double)accWgt);
-	      
-	      assert(ABS(1.0 - accRat) < 1.0E-5);
-	    }	          	  	  
-	}
-    }
-  else
-    {
-      int
-	accWgt = 0;
-      
-      double 
-	scaler = 0.0,       
-	accRat = 0.0; 
-      
-      if(scaleRates)
-	{
-	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
-	    {
-	      int 
-		localCount = 0,
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper;
-	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		  
-		  accWgt += w;
-		  
-		  accRat += (w * rate);
-		}
-	    }
-	  
-	  accRat /= ((double)accWgt);
-	  
-	  scaler = 1.0 / ((double)accRat);
-	  
-	  for(model = 0; model < tr->NumberOfModels; model++)
-	    {
-	      for(i = 0; i < tr->partitionData[model].numberOfCategories; i++)
-		tr->partitionData[model].perSiteRates[i] *= scaler;
-	    }
-	  
-	  for(model = 0, accRat = 0.0; model < tr->NumberOfModels; model++)
-	    {
-	      int 
-		localCount = 0,
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper;
-	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);	      
-		  
-		  accRat += (w * rate);
-		}
-	    }           
-	  
-	  accRat /= ((double)accWgt);	  
-	  
-	  assert(ABS(1.0 - accRat) < 1.0E-5);
-	}
-      else
-	{
-	  for(model = 0, accRat = 0.0, accWgt = 0; model < tr->NumberOfModels; model++)
-	    {
-	      int 
-		localCount = 0,
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper;
-	      
-	      for(i = lower, localCount = 0; i < upper; i++, localCount++)
-		{
-		  int 
-		    w = tr->aliaswgt[i];
-		  
-		  double
-		    rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		  
-		  accWgt += w;
-		  
-		  accRat += (w * rate);
-		}
-	    }
-	  
-	  accRat /=  (double)accWgt;
-	  
-	  assert(ABS(1.0 - accRat) < 1.0E-5);
-	}
-    }
-      
-  for(model = 0; model < tr->NumberOfModels; model++)
-    {
-      int 	    
-	lower = tr->partitionData[model].lower,
-	upper = tr->partitionData[model].upper;
-      
-      for(i = lower; i < upper; i++)
-	{
-	  double
-	    w = ((double)tr->aliaswgt[i]);	      
-	  
-	  double
-	    wtemp,
-	    temp = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-	  
-	  wtemp = temp * w;
-	  
-	  tr->wr[i]  = wtemp;
-	  tr->wr2[i] = temp * wtemp;
-	}
-    }         
-  
-  broadcastRatesFewPartitions(tr, mpiState.rank);
-}
 
 void updatePerSiteRates(tree *tr, boolean scaleRates)
 {
@@ -2703,26 +2367,25 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 
       if(tr->manyPartitions)
 	{
-	  assert(0); 		/* not implemented yet  */
 	  for(model = 0; model < tr->NumberOfModels; model++)      
 	    if(isThisMyPartition(tr, model))
 	      optRateCatModel(tr, model, lower_spacing, upper_spacing, tr->lhs);
 	}
       else
 	{
-	  optRateCatPthreads(tr, lower_spacing, upper_spacing, tr->lhs, mpiState.commSize, mpiState.rank);
+	  optRateCatPthreads(tr, lower_spacing, upper_spacing, tr->lhs);
 	  gatherRatesFewPartitions(tr);
 	}     
            
       for(model = 0; model < tr->NumberOfModels; model++)
-	{    
+	{ 
 	  boolean 
 	    execute;
 	  
 	  if(tr->manyPartitions)
 	    execute = isThisMyPartition(tr, model);
 	  else
-	    execute = (mpiState.rank == 0);
+	    execute =  ( ABS_ID(tr->threadId) == 0 ) ; /* =/  */
  
 	  if(execute)
 	    {
@@ -2785,7 +2448,7 @@ static void optimizeRateCategories(tree *tr, int _maxCategories)
 	      
 	      free(rc);
 	    }   
-	}            
+	} 
 
       updatePerSiteRates(tr, TRUE);	
 
@@ -3076,11 +2739,6 @@ void modOpt(tree *tr, double likelihoodEpsilon)
 	} 
        
       printAAmatrix(tr, fabs(currentLikelihood - tr->likelihood));    
-
-      /* puts("finished one step of optimization");  */
-      /* if(ABS_ID(tr) == 0) */
-	/* printf("did one round of opt\n");  */
-
     }
   while(fabs(currentLikelihood - tr->likelihood) > likelihoodEpsilon);  
   

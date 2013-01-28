@@ -46,9 +46,9 @@
 #endif
 
 
-#ifdef _HYBRID 
-extern void startPthreads(int argc, char *argv[]); 
-#endif
+/* #ifdef _HYBRID  */
+/* extern void startPthreads(int argc, char *argv[]);  */
+/* #endif */
 
 #include <pthread.h>
 
@@ -116,7 +116,7 @@ void *malloc_aligned(size_t size)
 
 static void printBoth(tree *tr, FILE *f, const char* format, ... )
 {
-  if(ABS_ID(tr) == 0)
+  if(ABS_ID(tr->threadId) == 0)
     {
       va_list args;
       va_start(args, format);
@@ -131,7 +131,7 @@ static void printBoth(tree *tr, FILE *f, const char* format, ... )
 
 void printBothOpen(tree *tr, const char* format, ... )
 {
-  if(ABS_ID(tr) == 0)
+  if(ABS_ID(tr->threadId) == 0)
     {
       FILE *f = myfopen(infoFileName, "ab");
       
@@ -323,8 +323,7 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{
-	  if(mpiState.rank == 0)
-	    printf("The file %s you want to open for reading does not exist, exiting ...\n", path);
+	  printf("The file %s you want to open for reading does not exist, exiting ...\n", path);
 	  errorExit(-1,NULL);
 	  return (FILE *)NULL;
 	}
@@ -334,8 +333,7 @@ FILE *myfopen(const char *path, const char *mode)
       if(fp)
 	return fp;
       else
-	{
-	  if(mpiState.rank == 0)
+	{	  
 	    printf("The file %s ExaML wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
 		   path, mode);
 	  errorExit(-1,NULL);
@@ -538,8 +536,7 @@ static int mygetopt(int argc, char **argv, char *opts, int *optind, char **optar
 
 static void printVersionInfo(void)
 {
-  if(mpiState.rank == 0)
-    printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  programName, programVersion, programDate); 
+  printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  programName, programVersion, programDate); 
 }
 
 static void printMinusFUsage(void)
@@ -564,8 +561,6 @@ static void printMinusFUsage(void)
 
 static void printREADME(void)
 {
-  if(mpiState.rank == 0)
-    {
       printVersionInfo();
       printf("\n");  
       printf("\nTo report bugs use the RAxML google group\n");
@@ -659,7 +654,6 @@ static void printREADME(void)
       printf("\n");
       printf("              DEFAULT: current directory\n");  
       printf("\n\n\n\n");
-    }
 }
 
 
@@ -820,11 +814,8 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	    break; 
 	  default:
 	    {
-	      if(mpiState.rank == 0)
-		{
-		  printf("Error select one of the following algorithms via -f :\n");
-		  printMinusFUsage();
-		}
+	      printf("Error select one of the following algorithms via -f :\n");
+	      printMinusFUsage();
 	      errorExit(-1,NULL);
 	    }
 	  }
@@ -846,11 +837,8 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 #ifdef _HYBRID	
 	sscanf(optarg,"%d", &(mpiState.numberOfThreads)); 
 #else
-	if(mpiState.rank == 0)
-	  {
-	    printf("Option -T does not have any effect with the sequential or parallel MPI version.\n");
-	    printf("It is used to specify the number of threads for the Pthreads-based parallelization\n");
-	  }	
+	printf("Option -T does not have any effect with the sequential or parallel MPI version.\n");
+	printf("It is used to specify the number of threads for the Pthreads-based parallelization\n");
 #endif
 	break; 
       case 't':
@@ -861,12 +849,9 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	strcpy(model,optarg);
 	if(modelExists(model, tr) == 0)
 	  {
-	    if(mpiState.rank == 0)
-	      {
-		printf("Rate heterogeneity Model %s does not exist\n\n", model);               
-		printf("For per site rates (called CAT in previous versions) use: PSR\n");	
-		printf("For GAMMA use: GAMMA\n");		
-	      }
+	    printf("Rate heterogeneity Model %s does not exist\n\n", model);               
+	    printf("For per site rates (called CAT in previous versions) use: PSR\n");	
+	    printf("For GAMMA use: GAMMA\n");		
 	    errorExit(-1,NULL);
 	  }
 	else
@@ -880,32 +865,26 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
   
   if(!byteFileSet)
     {
-      if(mpiState.rank == 0)
-	printf("\nError, you must specify a binary format data file with the \"-s\" option\n");
+      printf("\nError, you must specify a binary format data file with the \"-s\" option\n");
       errorExit(-1,NULL);
     }
 
   if(!modelSet)
     {
-      if(mpiState.rank == 0)
-	printf("\nError, you must specify a model of rate heterogeneity with the \"-m\" option\n");
+      printf("\nError, you must specify a model of rate heterogeneity with the \"-m\" option\n");
       errorExit(-1,NULL);
     }
 
   if(!nameSet)
     {
-      if(mpiState.rank == 0)
-	printf("\nError: please specify a name for this run with -n\n");
+      printf("\nError: please specify a name for this run with -n\n");
       errorExit(-1,NULL);
     }
 
   if(!treeSet && !adef->useCheckpoint)
     {
-      if(mpiState.rank == 0)
-	{
-	  printf("\nError: please either specify a starting tree for this run with -t\n");
-	  printf("or re-start the run from a checkpoint with -R\n");
-	}
+      printf("\nError: please either specify a starting tree for this run with -t\n");
+      printf("or re-start the run from a checkpoint with -R\n");
       
       errorExit(-1,NULL);
     }
@@ -948,7 +927,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 
    if(adef->mode == TREE_EVALUATION && tr->rateHetModel == CAT)
      {
-       if(ABS_ID(tr) == 0)
+       if(ABS_ID(tr->threadId) == 0)
 	 printf("Refusing to do model optimization and likelihood evaluation under the CAT model. \nFor different rate category to site assignments, likelihoods are not comparable. Rate categories cannot be assigned by the user currently, so in other words: \nNot implemented yet.\n "); 
        errorExit(-1,tr);
      }
@@ -1008,7 +987,7 @@ int errorExit(int e, tree *tr)
 
 static void makeFileNames(tree *tr)
 {
-  assert(ABS_ID(tr) == 0); 
+  assert(ABS_ID(tr->threadId) == 0); 
 
   int 
     infoFileExists = 0;
@@ -1032,11 +1011,8 @@ static void makeFileNames(tree *tr)
 
   if(infoFileExists)
     {
-      if(mpiState.rank == 0)
-	{
-	  printf("ExaML output files with the run ID <%s> already exist \n", run_id);
-	  printf("in directory %s ...... exiting\n", workdir);
-	}
+      printf("ExaML output files with the run ID <%s> already exist \n", run_id);
+      printf("in directory %s ...... exiting\n", workdir);    
 
 #ifndef _NOT_PRODUCTIVE
       errorExit(-1,NULL);	
@@ -1061,7 +1037,7 @@ static void makeFileNames(tree *tr)
 /* #ifndef  _NOT_PRODUCTIVE */
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
-  if(ABS_ID(tr) == 0)
+  if(ABS_ID(tr->threadId) == 0)
     {
       int i, model;
       FILE *infoFile = myfopen(infoFileName, "ab");
@@ -1207,11 +1183,12 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
+  if(ABS_ID(tr->threadId) != 0)
+    return; 
+
   FILE *logFile;
   char temporaryFileName[1024] = "";
 
-  assert(ABS_ID(tr) == 0); 
-      
   strcpy(temporaryFileName, resultFileName);
       
   switch(adef->mode)
@@ -1286,17 +1263,18 @@ void printLog(tree *tr)
   FILE *logFile;
   double t;
   
-  assert(ABS_ID(tr) == 0); 
+  if(ABS_ID(tr->threadId) == 0)
+    {  
+      t = gettime() - masterTime;
       
-  t = gettime() - masterTime;
+      logFile = myfopen(logFileName, "ab");
       
-  logFile = myfopen(logFileName, "ab");
-      
-  /* printf("%f %1.40f\n", t, tr->likelihood); */
+      /* printf("%f %1.40f\n", t, tr->likelihood); */
 
-  fprintf(logFile, "%f %f\n", t, tr->likelihood);
+      fprintf(logFile, "%f %f\n", t, tr->likelihood);
       
-  fclose(logFile);	     
+      fclose(logFile);	     
+    }
 }
 
 
@@ -1342,7 +1320,7 @@ void getDataTypeString(tree *tr, int model, char typeOfData[1024])
 
 static void finalizeInfoFile(tree *tr, analdef *adef)
 {
-  assert(ABS_ID(tr) == 0); 
+  assert(ABS_ID(tr->threadId) == 0); 
   double t;
 
   t = gettime() - masterTime;
@@ -1382,7 +1360,7 @@ static void finalizeInfoFile(tree *tr, analdef *adef)
 
 void makeItUntilHere(tree *tr)
 {
-  printf("SUCCESS %d/%d\n", ABS_ID(tr), ABS_NUM_RANK);
+  printf("SUCCESS %d/%d\n", ABS_ID(tr->threadId), ABS_NUM_RANK());
   fflush(stdout);
   HYBRID_BARRIER(tr->threadId);
   errorExit(0,tr);   
@@ -1405,6 +1383,15 @@ static void ignoreDenormFloats()
 }
 
 
+
+void isnanCheck(double *v)
+{
+#ifndef WIN32
+  assert(NOT isnan(*v)); 
+#endif
+}
+
+
 /**
    @brief Is wrapped by the main function. Thus, we can have this
    function as an entry point for the pthreads.
@@ -1423,21 +1410,23 @@ int realMain(int tid, int argc, char *argv[])
 
   tr->threadId = tid;
 
+  DM(tr, " my abs num is %d\n", ABS_ID(tr->threadId)); 
+
 
   /* generate the ExaML output file names and store them in strings */  
-  if(ABS_ID(tr) == 0)
+  if(ABS_ID(tr->threadId) == 0)
     makeFileNames(tr);  
+
+  mpiState.allTrees[tr->threadId] = tr; 
+  threadBarrier(tid);
 
   initializeTree(tr, adef); 
 
-  if(ABS_ID(tr) == 0)  
+  if(ABS_ID(tr->threadId) == 0)  
     {
       printModelAndProgramInfo(tr, adef, argc, argv);  
       printBothOpen(tr,"Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
     }  
-
-  threadBarrier(tid);
-  mpiState.allTrees[tr->threadId] = tr; 
 
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,
@@ -1463,7 +1452,7 @@ int realMain(int tid, int argc, char *argv[])
 	 when checkpointing and restarts were used */
 
 
-      if(ABS_ID(tr) == 0)
+      if(ABS_ID(tr->threadId) == 0)
 	accumulatedTime = 0.0;
 	
       /* get the starting tree: here we just parse the tree passed via the command line 
@@ -1476,7 +1465,7 @@ int realMain(int tid, int argc, char *argv[])
 	{
 	case TREE_EVALUATION: 	  
 	  modOpt(tr, adef->likelihoodEpsilon);
-	  if(ABS_ID(tr) == 0)
+	  if(ABS_ID(tr->threadId) == 0)
 	    {
 	      printLog(tr);
 	      printResult(tr, adef, TRUE); 
@@ -1493,7 +1482,7 @@ int realMain(int tid, int argc, char *argv[])
     }            
       
   /* print some more nonsense into the ExaML_info file */  
-  if(ABS_ID(tr) == 0 )
+  if(ABS_ID(tr->threadId) == 0 )
     finalizeInfoFile(tr, adef);
 
 
@@ -1501,34 +1490,30 @@ int realMain(int tid, int argc, char *argv[])
 }
 
 
-
-
-#ifdef _HYBRID
 void peekNumberOfThreads(int argc, char *argv[])
 {
-  int
-    bad_opt = FALSE; 
   char 
     *optarg,
     c; 
+  
+  mpiState.numberOfThreads = 1; 
 
-  while(!bad_opt && ((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:T:w:n:s:vhMSDQa", &optind, &optarg))!=-1))
+  while((c = mygetopt(argc,argv,"R:B:e:c:f:i:m:t:T:w:n:s:vhMSDQa", &optind, &optarg))!=-1)
     {
 
     switch(c)
-      {    	
-      case 'T': 
-	sscanf(optarg, "%d", &(mpiState.numberOfThreads));
-	if(mpiState.numberOfThreads < 1)
-	  errorExit(-1,NULL); 
-	break;
-      default: 
-	break;
+      {
+      case 'T':
+  	sscanf(optarg, "%d", &(mpiState.numberOfThreads));
+  	if(mpiState.numberOfThreads < 1)
+  	  errorExit(-1,NULL);
+  	break;
+      default:
+	/* assert(0);  */
+  	break;
       }
     }
-
 }
-#endif
 
 
 static void examl_initMPI(int argc, char **argv)
@@ -1544,10 +1529,14 @@ static void examl_initMPI(int argc, char **argv)
   mpiState.generation[PHASE_LNL_EVAL] = 0;
   mpiState.generation[PHASE_RATE_OPT] = 0;
 
-#ifdef _HYBRID
   peekNumberOfThreads(argc,argv);
+
+#ifdef _HYBRID
   pthread_barrier_init(&(mpiState.pBarrier), NULL, mpiState.numberOfThreads);
 #endif
+
+
+  mpiState.allTrees = (tree**)calloc(mpiState.numberOfThreads, sizeof(tree*)); 
  
 #ifdef _USE_RTS
   MPI_Comm_set_errhandler(mpiState.comm, MPI_ERRORS_RETURN);
@@ -1569,8 +1558,7 @@ int main(int argc, char *argv[])
   masterTime = gettime();         
 
 #ifdef _HYBRID
-  /* if(mpiState.numberOfThreads > 1 ) */
-    startPthreads(argc, argv);
+  startPthreads(argc, argv);
 #endif
 
   err = realMain(0, argc, argv); 
@@ -1579,3 +1567,16 @@ int main(int argc, char *argv[])
   return err; 
 }
 
+
+
+/**
+   @brief a convenient hybrid debug message
+*/
+void DM(tree *tr, const char *format, ...)
+{
+  printf("[%d/%d = %d] ", mpiState.rank, tr->threadId , ABS_ID(tr->threadId)); 
+  va_list args; 
+  va_start(args, format); 
+  vprintf(format, args); 
+  va_end(args);   
+}

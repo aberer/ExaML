@@ -34,22 +34,8 @@
  */
 
 
-/* #ifndef WIN32   */
-/* #include <sys/times.h> */
-/* #include <sys/types.h> */
-/* #include <sys/time.h> */
-/* #include <unistd.h>   */
-/* #endif */
-
-/* #include <limits.h> */
-/* #include <math.h> */
-/* #include <time.h>  */
-/* #include <stdlib.h> */
-/* #include <ctype.h> */
-/* #include <string.h> */
-/* #include <stdint.h> */
 #include "axml.h"
-
+#include "thread.h"
 #include "globalVariables.h"
 
 
@@ -302,7 +288,7 @@ void freeBitVectors(unsigned int **v, int n)
 
 
 
-static void newviewBipartitions(unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength)
+static void newviewBipartitions(tree *tr, unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength)
 {
   
   if(isTip(p->number, numsp))
@@ -322,7 +308,7 @@ static void newviewBipartitions(unsigned int **bitVectors, nodeptr p, int numsp,
       int i;      
     
     /* :TODO: replace master/worker scheme   */
-    assert(mpiState.rank ==  0); 
+    assert(ABS_ID(tr->threadId)  ==  0); 
 
     while(!p->xBips)
       {	
@@ -351,7 +337,7 @@ static void newviewBipartitions(unsigned int **bitVectors, nodeptr p, int numsp,
 	    while(!r->xBips)
 	      {
 		if(!r->xBips)
-		  newviewBipartitions(bitVectors, r, numsp, vectorLength);
+		  newviewBipartitions(tr, bitVectors, r, numsp, vectorLength);
 	      }	   
 
 	    for(i = 0; i < vectorLength; i++)
@@ -362,9 +348,9 @@ static void newviewBipartitions(unsigned int **bitVectors, nodeptr p, int numsp,
 	    while((!r->xBips) || (!q->xBips))
 	      {
 		if(!q->xBips)
-		  newviewBipartitions(bitVectors, q, numsp, vectorLength);
+		  newviewBipartitions(tr,bitVectors, q, numsp, vectorLength);
 		if(!r->xBips)
-		  newviewBipartitions(bitVectors, r, numsp, vectorLength);
+		  newviewBipartitions(tr,bitVectors, r, numsp, vectorLength);
 	      }	   	    	    	    	   
 
 	    for(i = 0; i < vectorLength; i++)
@@ -465,7 +451,7 @@ static void insertHashRF(unsigned int *bitVector, hashtable *h, unsigned int vec
 
 
 
-void bitVectorInitravSpecial(unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength, hashtable *h, int treeNumber, int function, branchInfo *bInf, 
+void bitVectorInitravSpecial(tree *tr, unsigned int **bitVectors, nodeptr p, int numsp, unsigned int vectorLength, hashtable *h, int treeNumber, int function, branchInfo *bInf, 
 			     int *countBranches, int treeVectorLength, boolean traverseOnly, boolean computeWRF)
 {
   if(isTip(p->number, numsp))
@@ -477,12 +463,12 @@ void bitVectorInitravSpecial(unsigned int **bitVectors, nodeptr p, int numsp, un
 
       do 
 	{
-	  bitVectorInitravSpecial(bitVectors, q->back, numsp, vectorLength, h, treeNumber, function, bInf, countBranches, treeVectorLength, traverseOnly, computeWRF);
+	  bitVectorInitravSpecial(tr, bitVectors, q->back, numsp, vectorLength, h, treeNumber, function, bInf, countBranches, treeVectorLength, traverseOnly, computeWRF);
 	  q = q->next;
 	}
       while(q != p);
            
-      newviewBipartitions(bitVectors, p, numsp, vectorLength);
+      newviewBipartitions(tr,bitVectors, p, numsp, vectorLength);
       
       assert(p->xBips);
 

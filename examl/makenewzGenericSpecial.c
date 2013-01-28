@@ -29,19 +29,10 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-/* #ifndef WIN32 */
-/* #include <unistd.h> */
-/* #endif */
 
+#include "axml.h"
 #include "faultTolerance.h"
 
-
-/* #include <math.h> */
-/* #include <time.h> */
-/* #include <stdlib.h> */
-/* #include <ctype.h> */
-/* #include <string.h> */
-#include "axml.h"
 
 #ifdef __SIM_SSE3
 #include <xmmintrin.h>
@@ -705,10 +696,6 @@ void execCore(tree *tr, volatile double *_dlnLdlz, volatile double *_d2lnLdlz2)
 {
   int model, branchIndex, i = 0;
   double lz;
-  /*  double 
-    buffer_dlnLdlz[NUM_BRANCHES],
-    buffer_d2lnLdlz2[NUM_BRANCHES];*/
-
 
   /* loop over partitions */
 
@@ -958,9 +945,8 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	
 	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches); 
 	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches); 
-
 	
-	HYBRID_ALLREDUCE_VAR(tr, reductionBuffer,  length, MPI_DOUBLE,double); 
+	HYBRID_ALLREDUCE_VAR(tr, reductionBuffer, length, MPI_DOUBLE, double); 
 
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 

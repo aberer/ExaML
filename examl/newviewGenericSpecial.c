@@ -27,17 +27,7 @@
  *  Bioinformatics 2006; doi: 10.1093/bioinformatics/btl446
  */
 
-/* #ifndef WIN32 */
-/* #include <unistd.h> */
-/* #endif */
 
-/* #include <math.h> */
-/* #include <time.h> */
-/* #include <stdlib.h> */
-/* #include <ctype.h> */
-/* #include <string.h> */
-/* #include <stdint.h> */
-/* #include <limits.h> */
 #include "axml.h"
 #include "globalVariables.h" 
 
