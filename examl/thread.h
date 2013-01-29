@@ -2,7 +2,8 @@
 #include "globalVariables.h"
 
 void startPthreads(int argc, char *argv[]); 
-void threadBarrier(int tid); 
+void tb_workerTrap(tree *tr); 
+void tb_releaseWorkers(tree *tr);
 
 /* :TODO: god this inlining sucks, figure this out later  */
 #ifdef _DEBUG
@@ -12,7 +13,7 @@ int ABS_NUM_RANK();
 inline int ABS_ID(int num)
 {
   assert(mpiState.numberOfThreads > 0); 
-  return  (mpiState.rank * mpiState.numberOfThreads) + num ; 
+  return(mpiState.rank * mpiState.numberOfThreads) + num ; 
 }
 
 
@@ -24,10 +25,6 @@ inline int ABS_NUM_RANK()
 #endif
 
 #ifdef _HYBRID
-/* #define ABS_ID(num) ((mpiState.rank  * mpiState.numberOfThreads) + num) */
-/* #define ABS_NUM_RANK (mpiState.commSize *  mpiState.numberOfThreads) */
-
-
 
 
 #define MASTER_TREE (mpiState.allTrees[0] )
@@ -42,32 +39,25 @@ inline int ABS_NUM_RANK()
   {									\
     if(tr->threadId == 0)						\
       {									\
-	int i,j;							\
 	type *buf = calloc(length, sizeof(type)) ;			\
 									\
-	threadBarrier(tr->threadId);					\
+	tb_workerTrap(tr);				\
   									\
-	for(i = 0; i < length;++i)					\
-	  for(j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
-	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i]; \
+	for(int i = 0; i < length;++i)					\
+	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
+	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i];		\
   									\
 	MPI_Allreduce(tr->tree_var, buf, length, mpi_type, MPI_SUM, mpiState.comm); \
-	/* MPI_Reduce(tr->tree_var, buf, length, mpi_type, MPI_SUM, 0, mpiState.comm); */ \
-	/* MPI_Bcast(buf, length, mpi_type, 0,  mpiState.comm);	 */	\
-  									\
-	for(j = 0; j < mpiState.numberOfThreads; ++j)			\
+									\
+	for(int j = 0; j < mpiState.numberOfThreads; ++j)		\
 	  memcpy(GET_TREE_NUM(j)->tree_var, buf, sizeof(type) * length); \
 									\
+	tb_releaseWorkers(tr);						\
 	free(buf);							\
-	threadBarrier(tr->threadId);					\
       }									\
     else								\
       {									\
-	/* ensures that the threads have provided their results  */	\
-	threadBarrier(tr->threadId);					\
-      									\
-	/* ensures that the threads received their results */		\
-	threadBarrier(tr->threadId);					\
+	tb_workerTrap(tr);						\
       }									\
   }									\
 
@@ -79,55 +69,46 @@ inline int ABS_NUM_RANK()
   {									\
     if(tr->threadId == 0)						\
       {									\
+	tb_workerTrap(tr);						\
 	MPI_Bcast(tr->tree_var,length,mpi_type,0,mpiState.comm);	\
-	threadBarrier(tr->threadId);					\
+	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
+	  memcpy(GET_TREE_NUM(i)->tree_var, MASTER_TREE->tree_var , length * sizeof(type) ); \
+	tb_releaseWorkers(tr);						\
       }									\
     else								\
       {									\
-	threadBarrier(tr->threadId);					\
-	memcpy(tr->tree_var, MASTER_TREE->tree_var , length * sizeof(type) ); \
+	tb_workerTrap(tr);						\
       }									\
   }									\
-
-
-
-
-/* #define HYBRID_GATHERALLV_MASTER(tr,tree_var, length, mpi_type, type) */
-/* { */
-/*   assert(ABS_ID(tr) == 0);  */
-  
-/* } */
-
-
-/* #define HYBRID_GATHERALLV_WORKER(tr, tree_var, length, mpi_type) */
-/* { */
-/* } */
-
-
 
 
 #define HYBRID_BCAST_VAR_1(tr,tree_var,mpi_type)			\
   {									\
    if(tr->threadId ==0)							\
       {									\
+	tb_workerTrap(tr);						\
 	MPI_Bcast(&(tr->tree_var),1,mpi_type,0,mpiState.comm);		\
-	threadBarrier(tr->threadId);					\
+	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
+	  GET_TREE_NUM(i)->tree_var = MASTER_TREE->tree_var;		\
+	tb_releaseWorkers(tr);						\
       }									\
     else								\
       {									\
-	threadBarrier(tr->threadId);					\
-	tr->tree_var = MASTER_TREE->tree_var;				\
+	tb_workerTrap(tr);						\
       }									\
   }									\
 
 
-#define HYBRID_BARRIER(tid)			\
-  {						\
-   threadBarrier(tid);				\
-   if(tid == 0)					\
-     MPI_Barrier(mpiState.comm);		\
-  }						\
-
+#define HYBRID_BARRIER(tr)					\
+  {								\
+    tb_workerTrap(tr);						\
+    if(tr->threadId == 0)					\
+      {								\
+	MPI_Barrier(mpiState.comm);				\
+	tb_releaseWorkers(tr);					\
+      }								\
+  }								\
+    
 
 #else 
 
@@ -145,7 +126,7 @@ inline int ABS_NUM_RANK()
     MPI_Bcast(&(tr->tree_var), 1,mpi_type,0,mpiState.comm);	\
   }							\
 
-#define HYBRID_BARRIER(tid)			\
+#define HYBRID_BARRIER(tr)			\
   {MPI_Barrier(mpiState.comm);}			\
 
 

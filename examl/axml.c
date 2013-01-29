@@ -683,7 +683,7 @@ static void analyzeRunId(char id[128])
 
   if(i == 0)
     {
-      printf("Error: please provide a string for the run id after \"-n\" \n");
+      printf("Error:n please provide a string for the run id after \"-n\" \n");
       assert(0);
     }
 
@@ -692,7 +692,7 @@ static void analyzeRunId(char id[128])
 static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 {
   boolean
-    bad_opt    =FALSE,
+    bad_opt = FALSE,
     resultDirSet = FALSE;
 
   char
@@ -765,7 +765,7 @@ static void get_args(int argc, char *argv[], analdef *adef, tree *tr)
 	tr->manyPartitions = TRUE;   	
 	break;
       case 's':		 	
-	strcpy(byteFileName, optarg);	 	
+	strcpy(byteFileName, optarg);
 	byteFileSet = TRUE;
 	/* printf("BYTE FILE is %s \n", byteFileName); */
 	break;      
@@ -1362,7 +1362,7 @@ void makeItUntilHere(tree *tr)
 {
   printf("SUCCESS %d/%d\n", ABS_ID(tr->threadId), ABS_NUM_RANK());
   fflush(stdout);
-  HYBRID_BARRIER(tr->threadId);
+  HYBRID_BARRIER(tr);
   errorExit(0,tr);   
 }
 
@@ -1418,7 +1418,10 @@ int realMain(int tid, int argc, char *argv[])
     makeFileNames(tr);  
 
   mpiState.allTrees[tr->threadId] = tr; 
-  threadBarrier(tid);
+
+  tb_workerTrap(tr); 
+  if(tr->threadId == 0)
+    tb_releaseWorkers(tr) ;
 
   initializeTree(tr, adef); 
 

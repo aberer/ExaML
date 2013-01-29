@@ -722,29 +722,26 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
      traversal descriptor list of nodes needs to be broadcast once again */
   
   tr->td[0].traversalHasChanged = TRUE;
-
+  
   evaluateIterative(tr);  
-    		
-  {
-    HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double ); 
-    
+  
+  HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double); 
+  
 #ifdef _USE_RTS
-    assert(0); 
-    mpiState.commPhase = PHASE_LNL_EVAL; 
-    mpiState.generation[PHASE_LNL_EVAL]++; 
-    if(mpiState.mpiError != MPI_SUCCESS)
-      handleMPIError(tr); 
+  assert(0); 
+  mpiState.commPhase = PHASE_LNL_EVAL; 
+  mpiState.generation[PHASE_LNL_EVAL]++; 
+  if(mpiState.mpiError != MPI_SUCCESS)
+    handleMPIError(tr); 
 #endif
 
-    for(model = 0; model < tr->NumberOfModels; model++)        
-      result += tr->perPartitionLH[model];
-         
-  }
+  for(model = 0; model < tr->NumberOfModels; model++)        
+    result += tr->perPartitionLH[model];
 
+  
   /* set the tree data structure likelihood value to the total likelihood */
 
-  tr->likelihood = result;    
-  
+  tr->likelihood = result;      
   
   /* do some bookkeeping to have traversalHasChanged in a consistent state */
 

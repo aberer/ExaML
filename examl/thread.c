@@ -70,20 +70,12 @@ void startPthreads(int argc, char *argv[])
 
   mpiState.threads    = (pthread_t *)malloc(mpiState.numberOfThreads * sizeof(pthread_t));
   tData      = (threadData *)malloc(mpiState.numberOfThreads * sizeof(threadData));
-  /* pthread_mutex_init(&mutex , (pthread_mutexattr_t *)NULL); */
-  /* reductionBuffer          = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
-  /* reductionBufferTwo       = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
-  /* reductionBufferThree     = (volatile double *)malloc(sizeof(volatile double) *  NumberOfThreads * tr->NumberOfModels); */
-  /* reductionBufferParsimony = (volatile int *)malloc(sizeof(volatile int) *  NumberOfThreads); */
 
-  /* branchInfos              = (volatile branchInfo **)malloc(sizeof(volatile branchInfo *) * NumberOfThreads); */
-
-  
   mpiState.exitCodes = calloc(mpiState.numberOfThreads,sizeof(int));
 
-  /* mpiState.barrier = calloc(mpiState.numberOfThreads, sizeof(volatile boolean) ); */
-  /* for(t = 0; t < mpiState.numberOfThreads; t++) */
-  /*   mpiState.barrier[t] = FALSE; */
+  mpiState.localGen = calloc(mpiState.numberOfThreads, sizeof(int));
+  mpiState.globalGen = 0; 
+  mpiState.threadsAreLocked = FALSE; 
 
   mpiState.allTrees = calloc(mpiState.numberOfThreads, sizeof(tree*)); 
   
@@ -103,29 +95,54 @@ void startPthreads(int argc, char *argv[])
   }
 }
 
-
-void threadBarrier(int tid)
-{
-  pthread_barrier_wait(&(mpiState.pBarrier)); 
+void tb_workerTrap(tree *tr)
+{    
+  if(tr->threadId == 0)
+    {
+      assert(NOT mpiState.threadsAreLocked); 
+      volatile int *myPtr = mpiState.localGen + tr->threadId; 
+      (*myPtr)++; 
+      int sum; 
+      do 
+	{
+	  sum = 0; 
+	  for(int i = 0; i < mpiState.numberOfThreads; ++i)
+	    if(*myPtr == mpiState.localGen[i])
+	      sum++; 
+	} while(sum != mpiState.numberOfThreads);       
+      mpiState.threadsAreLocked = TRUE; 
+    }
+  else 
+    {      
+      volatile int
+	*myPtr = mpiState.localGen + tr->threadId; 
+      (*myPtr)++; 
+      while(*myPtr != mpiState.globalGen); 
+    }
 }
+
+
+
+void tb_releaseWorkers(tree *tr)
+{  
+  assert(tr->threadId == 0 && mpiState.threadsAreLocked); 
+  ++mpiState.globalGen; 
+  mpiState.threadsAreLocked = FALSE; 
+}
+
 
 
 #else 
 #include "axml.h"
-
 
 inline int ABS_ID(int num)
 {
   return  (mpiState.rank) + num ; 
 }
 
-
 inline int ABS_NUM_RANK()
 {
   return mpiState.commSize; 
 }
 
-inline void threadBarrier(int tid)
-{
-}
 #endif

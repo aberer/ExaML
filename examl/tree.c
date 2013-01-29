@@ -695,7 +695,9 @@ void initializeTree(tree *tr, analdef *adef)
     i,
     model;
   
-  FILE 
+
+  /* :TODO: replace with myfopen  */
+  FILE
     *byteFile = fopen(byteFileName, "rb");
 
   double 

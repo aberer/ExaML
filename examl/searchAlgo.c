@@ -1360,9 +1360,12 @@ static void masterReadsCheckpoint(tree *tr)
     {
       checkPointState tmpState; 
       myfread(&tmpState, sizeof(checkPointState), 1, f);
-
     }
-  threadBarrier(tr->threadId);
+
+  /* :TODO: efficient? */
+  tb_workerTrap(tr);
+  if(tr->threadId == 0)
+    tb_releaseWorkers(tr);
   
   readCheckpoint(tr, &ckp, f);   
 }

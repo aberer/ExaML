@@ -1737,11 +1737,15 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
 	sendCnt +=  getNumSitesAssigned(tr, ABS_ID(i));
 
       tr->sendBuf = galloc(sendCnt , gd->aType); 
-
-      threadBarrier(tr->threadId) ; /* BARRIER 1  */
+      
+      /* inefficient, but that does not matter here */
+      tb_workerTrap(tr); 
+      tb_releaseWorkers(tr); 
       
       fillBuffer(tr, tr->sendBuf, ABS_ID(tr->threadId), gd); 
-      threadBarrier(tr->threadId); /* BARRIER 2  */
+
+      tb_workerTrap(tr); 
+      tb_releaseWorkers(tr); 
 
       switch(gd->aType)
 	{
@@ -1816,7 +1820,7 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
       for(int i = 0; i < tr->threadId; ++i)
 	myOffset += getNumSitesAssigned(tr, ABS_ID(i)); 
 
-      threadBarrier(tr->threadId); /* BARRIER 1  */
+      tb_workerTrap(tr); 
 
       GENERIC_DATA myGD; 
       myGD.aType = gd->aType; 
@@ -1832,7 +1836,7 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
 	}      
 
       fillBuffer(tr, &myGD, ABS_ID(tr->threadId), gd);
-      threadBarrier(tr->threadId); /* BARRIER 2  */
+      tb_workerTrap(tr); 
     } 
 }
 
@@ -1895,7 +1899,9 @@ static void gatherRatesManyPartitions(tree *tr)
 	    numPart++; 
     
        tr->TMP = (double*)calloc(numPart * tr->maxCategories, sizeof(double)); 
-       threadBarrier(tr->threadId); 
+
+       tb_workerTrap(tr);
+       tb_releaseWorkers(tr); 
 
        double *start = MASTER_TREE->TMP; 
        for(int model = 0, ctr = 0; model < tr->NumberOfModels; ++model)
@@ -1933,12 +1939,13 @@ static void gatherRatesManyPartitions(tree *tr)
 	   free(offsets); 
 	 } 
        
-       threadBarrier(tr->threadId); 
+       tb_workerTrap(tr);
+       tb_releaseWorkers(tr); 
        free(tr->TMP); 
     }
   else 
     {
-      threadBarrier(tr->threadId); 
+      tb_workerTrap(tr); 
       
       int myOffset = 0; 
       for(int model = 0; model < tr->NumberOfModels; ++model)
@@ -1954,8 +1961,8 @@ static void gatherRatesManyPartitions(tree *tr)
 	      ctr++; 
 	    }
 	}
-      threadBarrier(tr->threadId); 
 
+      tb_workerTrap(tr); 
     }  
   /* :TODO: the following is sub-optimal */
 }

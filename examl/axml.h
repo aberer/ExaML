@@ -1316,19 +1316,19 @@ typedef struct _mpiState
   int *exitCodes; 
 
 #ifdef _HYBRID
-  int numberOfThreads;   
-  volatile boolean *barrier;
-  volatile boolean threadsCanCheckBarrier; 
-  volatile boolean barrierIsCrossed; 
+  
+  boolean threadsAreLocked; 
+  int numberOfThreads;
+
+  volatile int *localGen; 
+  volatile int globalGen; 
+
   pthread_t *threads; 
   tree **allTrees; 
   pthread_barrier_t pBarrier; 
 #endif
   
 } examl_MPI_State; 
-
-
-/* extern void threadBarrier(int tid); */
 
 
 extern void makeItUntilHere(tree *tr); 
