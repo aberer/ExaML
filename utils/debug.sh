@@ -30,10 +30,10 @@ tree="-t ./testData/small-dna/49.tree"
 
 # exec="./raxmlLight-MPI-SSE3"
 exec=$(ls -tr $execOutput | tail -n 1 )
-model=GAMMA
+model=PSR
 
-
-args=" $aln -m $model $tree -n tmp "
+# noQ-noM
+args=" $aln -m $model $tree -n tmp  "
 export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
 export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
 

@@ -46,10 +46,6 @@
 #endif
 
 
-/* #ifdef _HYBRID  */
-/* extern void startPthreads(int argc, char *argv[]);  */
-/* #endif */
-
 #include <pthread.h>
 
 
@@ -162,7 +158,6 @@ void dontAllowInHybrid()
 /* QUARANTINE: those are problematic, since they work with global variables  */
 boolean getSmoothFreqs(int dataType)
 {
-  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].smoothFrequencies;
@@ -170,7 +165,6 @@ boolean getSmoothFreqs(int dataType)
 
 const unsigned int *getBitVector(int dataType)
 {
-  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].bitVector;
@@ -179,7 +173,6 @@ const unsigned int *getBitVector(int dataType)
 
 int getStates(int dataType)
 {
-  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].states;
@@ -187,7 +180,6 @@ int getStates(int dataType)
 
 int getUndetermined(int dataType)
 {
-  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return pLengths[dataType].undetermined;
@@ -197,7 +189,6 @@ int getUndetermined(int dataType)
 
 char getInverseMeaning(int dataType, unsigned char state)
 {
-  /* dontAllowInHybrid();  */
   assert(MIN_MODEL < dataType && dataType < MAX_MODEL);
 
   return  pLengths[dataType].inverseMeaning[state];

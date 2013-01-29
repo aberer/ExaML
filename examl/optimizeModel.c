@@ -1579,7 +1579,7 @@ static void getWeightsForScaler(tree *tr, double* accRat, double* accWgt)
   *accWgt = 0.0;
   
   for(int model = 0 ; model < tr->NumberOfModels; model++)
-    getWeightsForScaler_sub(tr, accRat, accRat, model); 
+    getWeightsForScaler_sub(tr, accRat, accWgt, model); 
 }
 
 
@@ -1997,7 +1997,7 @@ static void broadcastRatesFewPartitions(tree *tr)
   
   HYBRID_BCAST_VAR(tr, patrat, tr->originalCrunchedLength, MPI_DOUBLE, double); 
   HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
-
+  
   for(model = 0; model < tr->NumberOfModels; model++)
     { 
       HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
@@ -2029,62 +2029,9 @@ static void broadcastRatesFewPartitions(tree *tr)
 }
 
 
-static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
-{  
-  if(tr->numBranches > 1)
-    {        
-      for(int model = 0; model < tr->NumberOfModels; model++)
-	{
-	  double 
-	    scaler = 0.0,       
-	    accWgt = 0.0, 
-	    accRat = 0.0; 
 
-	  getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
-
-	  if(scaleRates)
-	    {
-	      accRat /= ((double)accWgt);	      
-	      scaler = 1.0 / ((double)accRat);
-	      
-	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
-		tr->partitionData[model].perSiteRates[i] *= scaler;	    
-	      
-	      accRat = 0.0;	 
-	      accWgt = 0.0; 
-	      getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
-	    }	         
-	  accRat /= ((double)accWgt); 
-	  assert(ABS(1.0 - accRat) < 1.0E-5);
-	}
-    }
-  else
-    {
-      double 
-	accWgt = 0.0,
-	scaler = 0.0,       
-	accRat = 0.0; 
-      
-      getWeightsForScaler(tr, &accRat, &accWgt) ;
-
-      accRat /= ((double)accWgt);	  
-
-      if(scaleRates)
-	{
-	  scaler = 1.0 / ((double)accRat);
-	  
-	  for(int model = 0; model < tr->NumberOfModels; model++)
-	    {
-	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
-		tr->partitionData[model].perSiteRates[i] *= scaler;
-	    }
-	  
-	  getWeightsForScaler(tr, &accRat, &accWgt); 	  
-	  accRat /= ((double)accWgt);	  	  
-	}
-      assert(ABS(1.0 - accRat) < 1.0E-5);
-    }
-      
+void computeWrAndWr2FewPartitions(tree *tr)
+{
   for(int model = 0; model < tr->NumberOfModels; model++)
     {
       int 	    
@@ -2105,10 +2052,72 @@ static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
 	  tr->wr[i]  = wtemp;
 	  tr->wr2[i] = temp * wtemp;
 	}
-    } 
+    }
+}
+
+
+static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
+{  
+  if(tr->numBranches > 1)
+    {        
+      for(int model = 0; model < tr->NumberOfModels; model++)
+	{
+	  double 
+	    scaler = 0.0,       
+	    accWgt = 0.0, 
+	    accRat = 0.0; 
+	  
+	  getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
+
+	  if(scaleRates)
+	    {
+	      accRat /= ((double)accWgt);	      
+	      scaler = 1.0 / ((double)accRat);
+	      
+	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		tr->partitionData[model].perSiteRates[i] *= scaler;	    
+	      
+	      accRat = 0.0;	 
+	      accWgt = 0.0; 
+	      getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
+	    }	         
+	  accRat /= ((double)accWgt);
+	  assert(ABS(1.0 - accRat) < 1.0E-5);
+	}
+    }
+  else
+    {
+      double 
+	accWgt = 0.0,
+	scaler = 0.0,       
+	accRat = 0.0; 
+      
+      getWeightsForScaler(tr, &accRat, &accWgt);
+      accRat /= ((double)accWgt); 
+
+      if(scaleRates)
+	{
+	  scaler = 1.0 / ((double)accRat);
+	  
+	  for(int model = 0; model < tr->NumberOfModels; model++)
+	    {
+	      for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
+		tr->partitionData[model].perSiteRates[i] *= scaler;
+	    }
+	  
+	  getWeightsForScaler(tr, &accRat, &accWgt); 	  
+	  accRat /= ((double)accWgt);	  	  
+	}
+      assert(ABS(1.0 - accRat) < 1.0E-5);
+    }
+      
+  computeWrAndWr2FewPartitions(tr); 
   
   broadcastRatesFewPartitions(tr);
 }
+
+
+
 
 
 
@@ -2117,6 +2126,40 @@ static void updatePerSiteRatesFewPartitions(tree *tr, boolean scaleRates)
    per-site rates are not scaled to obtain an overall mean rate 
    of 1.0
 */
+
+
+
+
+void computeWrAndWr2(tree *tr, int model)
+{
+  int
+    lower = tr->partitionData[model].lower,
+    upper = tr->partitionData[model].upper;
+
+
+  for(int i = lower; i < upper; i++)
+    {
+      double
+	w = ((double)tr->aliaswgt[i]);	      
+		  
+      double
+	wtemp,
+	temp = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
+		  
+      wtemp = temp * w;
+		  
+      tr->wr[i]  = wtemp;
+      tr->wr2[i] = temp * wtemp;
+    }
+
+  for(int i = lower, localCount = 0; i < upper; i++, localCount++)
+    {	    	      
+      tr->partitionData[model].wr[localCount]  = tr->wr[i];
+      tr->partitionData[model].wr2[localCount] = tr->wr2[i];
+      tr->partitionData[model].rateCategory[localCount] = tr->rateCategory[i];		
+    } 
+}
+
 
 
 static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
@@ -2131,105 +2174,27 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
       for(int model = 0; model < tr->NumberOfModels; model++)
 	{
 	  if(isThisMyPartition(tr,  model))
-	    {
-	      int 	       
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper; 
-
-	      
+	    {	      
 	      if(scaleRates)
-		{		  
-		  for(int i = lower; i < upper; i++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		      
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		      
-		      accWgt += w;
-		      
-		      accRat += (w * rate);
-		    }	   
-		  
+		{ 
+		  accRat = 0.0; 
+		  accWgt = 0.0; 
+		  getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 
 		  accRat /= ((double)accWgt);
 		  
 		  scaler = 1.0 / ((double)accRat);
 	  	  
 		  for(int i = 0; i < tr->partitionData[model].numberOfCategories; i++)
 		    tr->partitionData[model].perSiteRates[i] *= scaler;	    
-		  
-		  accRat = 0.0;	 
-		  
-		  for(int i = lower; i < upper; i++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		      
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);	      
-		      
-		      accRat += (w * rate);
-		    }	         
-		  
-		  accRat /= ((double)accWgt);	  
-		  
-		  assert(ABS(1.0 - accRat) < 1.0E-5);
 		}
-	      else
-		{
-		  double 		   
-		    accRat = 0.0; 
-		  
-		  int 
-		    accWgt     = 0;
-		  
-		  for(int i = lower; i < upper; i++)
-		    {
-		      int 
-			w = tr->aliaswgt[i];
-		      
-		      double
-			rate = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		      
-		      assert(0 <= tr->rateCategory[i] && tr->rateCategory[i] < tr->maxCategories);
-		      
-		      accWgt += w;
-		      
-		      accRat += (w * rate);
-		    }	   
-		  
-		  accRat /= ((double)accWgt);
-		  
-		  assert(ABS(1.0 - accRat) < 1.0E-5);
-		}
-	      
-	      for(int i = lower; i < upper; i++)
-		{
-		  double
-		    w = ((double)tr->aliaswgt[i]);	      
-		  
-		  double
-		    wtemp,
-		    temp = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  wtemp = temp * w;
-		  
-		  tr->wr[i]  = wtemp;
-		  tr->wr2[i] = temp * wtemp;
-		} 
-	
-	      
-	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
-		{	    	      
-		  tr->partitionData[model].wr[localCount]  = tr->wr[i];
-		  tr->partitionData[model].wr2[localCount] = tr->wr2[i];
-		  tr->partitionData[model].rateCategory[localCount] = tr->rateCategory[i];		
-		}	      
+
+	      accRat = 0.0;	 
+	      accWgt = 0.0; 
+	      getWeightsForScaler_sub(tr, &accRat, &accWgt, model); 	         
+	      accRat /= ((double)accWgt); 
+	      assert(ABS(1.0 - accRat) < 1.0E-5);
+
+	      computeWrAndWr2(tr, model); 
 	    } 
 	}
     }
@@ -2259,43 +2224,7 @@ static void updatePerSiteRatesManyPartitions(tree *tr, boolean scaleRates)
       for( int model = 0; model < tr->NumberOfModels; model++)
 	{
 	  if(isThisMyPartition(tr,  model))
-	    {
-	      int 
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper;
-	      
-	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
-		{
-		  double
-		    w = ((double)tr->aliaswgt[i]);	      
-		  
-		  double
-		    wtemp,
-		    temp = tr->partitionData[model].perSiteRates[tr->rateCategory[i]];
-		  
-		  wtemp = temp * w;
-		  
-		  tr->wr[i]  = wtemp;
-		  tr->wr2[i] = temp * wtemp;
-		}
-	    }
-	}         
-
-      for(int model = 0; model < tr->NumberOfModels; model++)
-	{  
-	  if(isThisMyPartition(tr, model))
-	    {
-	      int 
-		lower = tr->partitionData[model].lower,
-		upper = tr->partitionData[model].upper;	  
-	      
-	      for(int i = lower, localCount = 0; i < upper; i++, localCount++)
-		{	    	      
-		  tr->partitionData[model].wr[localCount]  = tr->wr[i];
-		  tr->partitionData[model].wr2[localCount] = tr->wr2[i];
-		  tr->partitionData[model].rateCategory[localCount] = tr->rateCategory[i];
-		}
-	    }
+	    computeWrAndWr2(tr,model); 
 	}
     }  
 
