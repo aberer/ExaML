@@ -140,10 +140,12 @@ static void reset_branch_length(nodeptr p, int numBranches)
   }
 }
 
+#if 0
 static double exp_pdf(double lambda, double x)
 {
   return (lambda * exp(-(lambda * x))); 
 }
+#endif
 
 //setting this out to allow for other types of setting
 static void set_branch_length_sliding_window(nodeptr p, int numBranches,state * s, boolean record_tmp_bl)
@@ -184,7 +186,7 @@ static void set_branch_length_sliding_window(nodeptr p, int numBranches,state * 
     //s->bl_prior += 1;
   }
 }
-
+#if 0
 static void traverse_branches(nodeptr p, int *count, state * s, boolean resetBL)
 {
   nodeptr q;
@@ -208,7 +210,7 @@ static void traverse_branches(nodeptr p, int *count, state * s, boolean resetBL)
     newviewGeneric(s->tr, p, FALSE);     // not sure if we need this
   }
 }
-
+#endif
 static node *select_branch_by_id_dfs_rec( node *p, int *cur_count, int target, state *s ) {
   if( (*cur_count) == target ) {
     return p;
@@ -281,7 +283,7 @@ static node *select_branch_by_id_dfs( node *p, int target, state *s ) {
   
 }
 
-
+#if 0
 static void update_all_branches(state * s, boolean resetBL)
 {
   int updated_branches = 0;
@@ -290,7 +292,7 @@ static void update_all_branches(state * s, boolean resetBL)
   traverse_branches(s->tr->start->back, &updated_branches, s, resetBL);
   assert(updated_branches == s->tr->mxtips + s->tr->mxtips - 3);
 }
-
+#endif
 
 static void traverse_branches_set_fixed(nodeptr p, int *count, state * s, double z )
 {
@@ -319,7 +321,7 @@ static void traverse_branches_set_fixed(nodeptr p, int *count, state * s, double
   }
 }
 
-
+#if 0
 /*
  * should be sliding window proposal
  */
@@ -349,14 +351,14 @@ static void simpleBranchLengthProposalReset(state * instate)
 {
   update_all_branches(instate, TRUE);
 }
-
+#endif
 
 
 /*
  * should be sliding window proposal
  */
 
-static boolean randomBranchLengthProposalApply(state * instate)
+static void random_branch_length_proposal_apply(state * instate)
 {
    
   //for each branch get the current branch length
@@ -375,10 +377,10 @@ static boolean randomBranchLengthProposalApply(state * instate)
 
   instate->single_bl_branch = target_branch;
   evaluateGeneric(instate->tr, instate->tr->start, TRUE); /* update the tr->likelihood */
-  return TRUE;
+//   return TRUE;
 }
 
-static void randomBranchLengthProposalReset(state * instate)
+static void random_branch_length_proposal_reset(state * instate)
 {
   node *p;
   assert( instate->single_bl_branch != -1 );
@@ -399,7 +401,7 @@ static void randomBranchLengthProposalReset(state * instate)
  * should be sliding window proposal
  */
 
-static void editSubsRates(tree *tr, int model, int subRatePos, double subRateValue)
+static void edit_subs_rates(tree *tr, int model, int subRatePos, double subRateValue)
 {
   assert(tr->partitionData[model].dataType = DNA_DATA);
   assert(subRateValue <= RATE_MAX && subRateValue >= RATE_MIN);
@@ -409,7 +411,7 @@ static void editSubsRates(tree *tr, int model, int subRatePos, double subRateVal
   tr->partitionData[model].substRates[subRatePos] = subRateValue;
 }
 
-static void simpleModelProposalApply(state * instate)
+static void simple_model_proposal_apply(state * instate)
 {
   //TODO: add safety to max and min values
   //record the old ones
@@ -432,7 +434,7 @@ static void simpleModelProposalApply(state * instate)
       if(new_value > RATE_MAX) new_value = RATE_MAX;
       if(new_value < RATE_MIN) new_value = RATE_MIN;
       //printf("%i %f %f\n", state, curv, new_value);
-      editSubsRates(instate->tr,instate->model, state, new_value);
+      edit_subs_rates(instate->tr,instate->model, state, new_value);
     }
   //recalculate eigens
 
@@ -455,7 +457,7 @@ static void simpleModelProposalApply(state * instate)
   //only calculate the new ones
 }
 
-static void restoreSubsRates(tree *tr, analdef *adef, int model, int numSubsRates, double *prevSubsRates)
+static void restore_subs_rates(tree *tr, analdef *adef, int model, int numSubsRates, double *prevSubsRates)
 {
   assert(tr->partitionData[model].dataType = DNA_DATA);
   int i;
@@ -469,13 +471,13 @@ static void restoreSubsRates(tree *tr, analdef *adef, int model, int numSubsRate
   evaluateGeneric(tr, tr->start, TRUE);
 }
 
-static void simpleModelProposalReset(state * instate)
+static void simple_model_proposal_reset(state * instate)
 {
-  restoreSubsRates(instate->tr, instate->adef, instate->model, instate->numSubsRates, instate->curSubsRates);
+  restore_subs_rates(instate->tr, instate->adef, instate->model, instate->numSubsRates, instate->curSubsRates);
   //evaluateGeneric(instate->tr, instate->tr->start, FALSE);
 }
 
-static nodeptr selectRandomSubtree(tree *tr)
+static nodeptr select_random_subtree(tree *tr)
 {
   nodeptr 
     p;
@@ -508,7 +510,7 @@ static nodeptr selectRandomSubtree(tree *tr)
   return p;
 }
 
-static void recordBranchInfo(nodeptr p, double *bl, int numBranches)
+static void record_branch_info(nodeptr p, double *bl, int numBranches)
 {
   int i;
   for(i = 0; i < numBranches; i++)
@@ -516,7 +518,7 @@ static void recordBranchInfo(nodeptr p, double *bl, int numBranches)
 }
 static int spr_depth = 0;
 
-static node *randomSPR_traverse( tree *tr, node *n ) {
+static node *random_spr_traverse( tree *tr, node *n ) {
 
   double randprop = (double)rand()/(double)RAND_MAX;
   
@@ -524,31 +526,31 @@ static node *randomSPR_traverse( tree *tr, node *n ) {
     return n;
   } else if( randprop < 0.75 ) {
     spr_depth++;
-    return randomSPR_traverse( tr, n->next->back );
+    return random_spr_traverse( tr, n->next->back );
   } else {
     spr_depth++;
-    return randomSPR_traverse( tr, n->next->next->back );
+    return random_spr_traverse( tr, n->next->next->back );
   }
 }
-static node *randomSPR( tree *tr, node *n ) {
+static node *random_spr( tree *tr, node *n ) {
   if( isTip(n->number, tr->mxtips ) ) {
     return n;
   }
   spr_depth = 1;
   double randprop = (double)rand()/(double)RAND_MAX;
   if( randprop < 0.5 ) {
-    return randomSPR_traverse( tr, n->next->back );
+    return random_spr_traverse( tr, n->next->back );
   } else {
-    return randomSPR_traverse( tr, n->next->next->back );
+    return random_spr_traverse( tr, n->next->next->back );
   }
 }
 
-static void randomSPRApply(state *instate)
+static void random_spr_apply(state *instate)
 {
   tree * tr = instate->tr;
   
   nodeptr    
-    p = selectRandomSubtree(tr);
+    p = select_random_subtree(tr);
   
   /* evaluateGeneric(tr, tr->start, TRUE);
      printf("%f \n", tr->likelihood);*/
@@ -566,8 +568,8 @@ static void randomSPRApply(state *instate)
   instate->nb  = p->next->back;
   instate->nnb = p->next->next->back;
   
-  recordBranchInfo(instate->nb, instate->nbz, instate->tr->numBranches);
-  recordBranchInfo(instate->nnb, instate->nnbz, instate->tr->numBranches);
+  record_branch_info(instate->nb, instate->nbz, instate->tr->numBranches);
+  record_branch_info(instate->nnb, instate->nnbz, instate->tr->numBranches);
 
   /* removeNodeBIG(tr, p,  tr->numBranches); */
   /* remove node p */
@@ -594,16 +596,16 @@ static void randomSPRApply(state *instate)
   }
   
   if( randprop <= 0.5 ) {
-    tr->insertNode = randomSPR( tr, instate->nb );
+    tr->insertNode = random_spr( tr, instate->nb );
   } else {
-    tr->insertNode = randomSPR( tr, instate->nnb );
+    tr->insertNode = random_spr( tr, instate->nnb );
   }
 
   
 
   instate->q = tr->insertNode;
   instate->r = instate->q->back;
-  recordBranchInfo(instate->q, instate->qz, instate->tr->numBranches);
+  record_branch_info(instate->q, instate->qz, instate->tr->numBranches);
 
   
   Thorough = 0;
@@ -617,7 +619,7 @@ static void randomSPRApply(state *instate)
   //printf("%f \n", tr->likelihood);
 }
 
-static void randomSPRReset(state * instate)
+static void random_spr_reset(state * instate)
 {
   /* prune the insertion */
   hookup(instate->q, instate->r, instate->qz, instate->tr->numBranches);
@@ -630,7 +632,7 @@ static void randomSPRReset(state * instate)
 
 
 //simple sliding window
-static void simpleGammaProposalApply(state * instate)
+static void simple_gamma_proposal_apply(state * instate)
 {
   //TODO: add safety to max and min values
   double newalpha, curv, r,mx,mn;
@@ -651,7 +653,7 @@ static void simpleGammaProposalApply(state * instate)
   evaluateGeneric(instate->tr, instate->tr->start, TRUE);
 }
 
-static void simpleGammaProposalReset(state * instate)
+static void simple_gamma_proposal_reset(state * instate)
 {
   instate->tr->partitionData[instate->model].alpha = instate->curAlpha;
 
@@ -660,129 +662,96 @@ static void simpleGammaProposalReset(state * instate)
   evaluateGeneric(instate->tr, instate->tr->start, TRUE);
 }
 
-
-static void dispatchProposalApply( proposal_type ptype, state *instate ) {
-  //     assert(which_proposal == SPR || which_proposal == stNNI ||
-//            which_proposal == UPDATE_ALL_BL || which_proposal == UPDATE_SINGLE_BL || 
-//            which_proposal == UPDATE_MODEL || which_proposal == UPDATE_GAMMA );
+typedef struct {
+  int  ptype;
+  void (*apply_func)( state * state );
+  void (*reset_func)( state * state );
   
-  switch( ptype ) {
-    case UPDATE_MODEL:
-      simpleModelProposalApply(instate);
-      break;
-      
-    case UPDATE_ALL_BL:
-      simpleBranchLengthProposalApply(instate);
-      break;
-      
-    case UPDATE_SINGLE_BL:
-      randomBranchLengthProposalApply( instate );
-      break;
+} proposal_functions;
+
+
+static proposal_functions get_proposal_functions( proposal_type ptype ) {
+  
+  #define NUM_PROP_FUNCS (4)
+  const static proposal_functions prop_funcs[NUM_PROP_FUNCS] = { 
+                    { UPDATE_MODEL, simple_model_proposal_apply, simple_model_proposal_reset },
+                    { UPDATE_SINGLE_BL, random_branch_length_proposal_apply, random_branch_length_proposal_reset },
+                    { UPDATE_GAMMA, simple_gamma_proposal_apply, simple_gamma_proposal_reset },
+                    { SPR, random_spr_apply, random_spr_reset }
+  };
+  int i;
+  // REMARK: don't worry about the linear search until NUM_PROP_FUNCS exceeds 20...
+  for( i = 0; i < NUM_PROP_FUNCS; ++i ) {
+    if( prop_funcs[i].ptype == ptype ) {
+      return prop_funcs[i];
+    }
+  }
+  
+  assert( 0 && "ptype not found" );
+  
+  #undef NUM_PROP_FUNCS
+}
+
+static void dispatch_proposal_apply( proposal_type ptype, state *instate ) {
+  get_proposal_functions(ptype).apply_func( instate );
+}
+
+static void dispatch_proposal_reset( proposal_type ptype, state *instate ) {
+  get_proposal_functions(ptype).reset_func( instate );
+}
+
+
+typedef struct {
+  float prob;
+  int   type;
+} prob_bucket_t;
+
+static int draw_prob_bucket( const prob_bucket_t *buckets, size_t num_buckets ) {
+  double r = (double)rand()/(double)RAND_MAX;
+  
+  float lower_bound = 0.0;
+//   float upper_bound = buckets[0].prob;
+  size_t i = 0;
+  
+  assert( num_buckets > 0 );
+  
+  
+  for( i = 0; i < num_buckets - 1; ++i ) {
+    float upper_bound = lower_bound + buckets[i].prob;
     
-    case UPDATE_GAMMA:
-      simpleGammaProposalApply( instate );
-      break;
- 
-      
-      
-    case SPR:
-//       if (randprop < 0.15)
-//         instate->maxradius = 1;
-//       else
-//         instate->maxradius = 2;
-      
-      randomSPRApply(instate);  
-      break;
-      
-      
-    default:
-      assert(0);
-  } 
+    if( r >= lower_bound && r < upper_bound ) {
+      return buckets[i].type;
+    }
+    
+    lower_bound = upper_bound;
+    
+  }
+  
+  return buckets[num_buckets - 1].type;
   
 }
 
-static proposal_type selectProposalType(state * instate)
+static proposal_type select_proposal_type(state * instate)
 /* so here the idea would be to randomly choose among proposals? we can use typedef enum to label each, and return that */ 
 {
-  double randprop = (double)rand()/(double)RAND_MAX;
-//   boolean proposalSuccess;
-  //double start_LH = evaluateGeneric(instate->tr, instate->tr->start); /* for validation */
-//   proposal_type ptype;
-  //simple proposal
-  
-#if 0
-  if(randprop < 0.25) 
-  {
-    if(randprop < 0.2)//TOPOLOGICAL MOVE
-    {
-      if(randprop > 0.1)//SPR MOVE
-      {
-        proposal_type = SPR;
-        if (randprop < 0.15)
-          instate->maxradius = 1;
-        else
-          instate->maxradius = 2;
 
-        doSPR(instate->tr, instate);
-
-        proposalSuccess = TRUE;
-
-        /* TODO  shall we still want to use this as an alternative to the parsimony-informed SPR?*/
-        /*proposalSuccess = simpleNodeProposal(instate);*/
-      }
-      else
-      {
-        proposal_type = stNNI;
-        proposalSuccess = stNNIproposal(instate); 
-        if(proposalSuccess == FALSE)
-        {
-          printBothOpen("ERROR: stNNI proposal failed\n");
-          assert(FALSE);
-        }
-      }
-      if(proposalSuccess == FALSE)
-      {
-        assert(FALSE); // this should either never happen or look below and return PROPOSAL_FAILED to react accordingly
-      }
-      else
-      {
-        /* A moved has been made, previous state is in instate */
-        if(proposal_type != stNNI) /*TODOFER delete this when bl are changed (bl should change always in the stNNI?)*/
-          assert(instate->tr->startLH != instate->tr->likelihood);
-      }
-    }
-    else{//MODEL
-      proposal_type = UPDATE_MODEL;
-      simpleModelProposal(instate);
-    }
-  }
-  else
-  {
-    if(randprop < 0.95)//UPDATE_ALL_BL
-    {
-      proposal_type = UPDATE_ALL_BL;
-      instate->bl_prior = 0;
-      //printBothOpen("Propose BL_UPDATE\n");
-      assert(proposal_type == UPDATE_ALL_BL);
-      proposalSuccess = simpleBranchLengthProposal(instate);
-      assert(instate->tr->startLH != instate->tr->likelihood);
-      assert(proposalSuccess);
-    }
-    else//GAMMA
-    {
-      proposal_type = UPDATE_GAMMA;
-      simpleGammaProposal(instate);
-    }
-  }
-  //record the curprior
-  instate->newprior = instate->bl_prior;
-  //print_proposal(proposal_type);
-  return proposal_type;
-#else
 //   printf( "%d %f\n", processID, randprop );
   instate->newprior = instate->bl_prior;
   
-  
+#if 1
+#define NUM_PROPOSALS (4)
+  const static prob_bucket_t proposals[NUM_PROPOSALS] = { 
+                      { 0.1, UPDATE_MODEL }, 
+                      { 0.1, UPDATE_GAMMA }, 
+                      { 0.3, UPDATE_SINGLE_BL}, 
+                      { 0.5, SPR } 
+  };
+  return draw_prob_bucket( proposals, NUM_PROPOSALS );
+#undef NUM_PROPOSALS
+
+#else
+  {
+  double randprop = (double)rand()/(double)RAND_MAX;
   // select proposal type based on randprop
   if( randprop < 0.1 ) {
     return UPDATE_MODEL;
@@ -795,49 +764,14 @@ static proposal_type selectProposalType(state * instate)
   } else {
     return SPR;
   }
-  
-  
-  
-
-//   return ptype;
-#endif
-  
-}
-
-static void dispatchProposalReset(proposal_type proposal_type, state * curstate)
-{
-  switch(proposal_type)
-  {
-
-    case SPR:
-      randomSPRReset(curstate);
-      break;
-#if 0
-    case stNNI:
-      reset_stNNI(curstate);
-      break;
-#endif
-    case UPDATE_ALL_BL:
-      simpleBranchLengthProposalReset(curstate);
-      //printf("RESETBL\n");
-      break;
-
-    case UPDATE_SINGLE_BL:
-      randomBranchLengthProposalReset(curstate);
-      break;
-      
-    case UPDATE_MODEL:
-      simpleModelProposalReset(curstate);
-      break;
-#if 1
-    case UPDATE_GAMMA:
-      simpleGammaProposalReset(curstate);
-      break;
-#endif
-    default:
-      assert(FALSE);
   }
+#endif
+  
+
+  
 }
+
+
 
 #if 0
 static void printRecomTree(tree *tr, boolean printBranchLengths, char *title)
@@ -857,7 +791,7 @@ static void printRecomTree(tree *tr, boolean printBranchLengths, char *title)
 #endif
 
 
-static void printStateFile(int iter, state * curstate)
+static void print_state_file(int iter, state * curstate)
 { 
   const size_t tmp_len = 256;
   char tmp[tmp_len];
@@ -877,7 +811,7 @@ static void printStateFile(int iter, state * curstate)
 }
 
 
-node *find_tip( node *n, tree *tr ) {
+static node *find_tip( node *n, tree *tr ) {
   if( isTip(n->number, tr->mxtips) ) {
     return n;
   } else {
@@ -1102,10 +1036,10 @@ void mcmc(tree *tr, analdef *adef)
     //which_proposal = proposal(curstate);
     
     // select proposal type
-    which_proposal = selectProposalType( curstate );
+    which_proposal = select_proposal_type( curstate );
     
     // apply the proposal function
-    dispatchProposalApply(which_proposal, curstate );
+    dispatch_proposal_apply(which_proposal, curstate );
 
     perf_timer_add_int( &move_timer ); //////////////////////////////// ADD INT
     // FIXME: why is this here?
@@ -1187,7 +1121,7 @@ void mcmc(tree *tr, analdef *adef)
     {
       //printBothOpen("rejected , iter %d tr LH %f, startLH %f, %i \n", j, tr->likelihood, tr->startLH, which_proposal);
       //print_proposal(which_proposal);
-      dispatchProposalReset(which_proposal,curstate);
+      dispatch_proposal_reset(which_proposal,curstate);
       
       switch(which_proposal)
         {

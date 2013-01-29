@@ -566,7 +566,7 @@ static void perf_timer_print( perf_timer *self ) {
   for( i = 1; i < self->cur_int; ++i ) {
     double d = self->int_ticks[i] - self->int_ticks[i-1];
     
-    printf( "int %d: %f (%f\%) (%f tpi)\n", (int)(i - 1), d, d / sum_nticks * 100, d / self->cum_sum );
+    printf( "int %d: %f (%f%%) (%f tpi)\n", (int)(i - 1), d, d / sum_nticks * 100, d / self->cum_sum );
   }
 }
 
