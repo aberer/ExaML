@@ -1,8 +1,8 @@
 #! /bin/bash
 
 exec="/lhome/labererae/proj/ExaML/examl/examl"
-aln="/lhome/labererae/proj/my-ExaML/testData/small-dna/49.binary"
-tree="/lhome/labererae/proj/my-ExaML/testData/small-dna/49.tree"
+aln="/lhome/labererae/proj/my-ExaML/testData/medium-dna/aln.binary"
+tree="/lhome/labererae/proj/my-ExaML/testData/medium-dna/tree"
 for model in  GAMMA PSR 
 do 
     for multiSched in  1 0 

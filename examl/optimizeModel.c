@@ -940,6 +940,8 @@ static void optAlpha(tree *tr, double modelEpsilon, linkageList *ll)
 	  for(k = 0; k < ll->ld[i].partitions; k++)
 	    {	      
 	      tr->partitionData[ll->ld[i].partitionList[k]].alpha = startAlpha[i];
+	      
+	      /* DM(tr, "\nalpha=%f\n",tr->partitionData[ll->ld[i].partitionList[k]].alpha);  */
 
 	      makeGammaCats(tr->partitionData[ll->ld[i].partitionList[k]].alpha, tr->partitionData[ll->ld[i].partitionList[k]].gammaRates, 4, tr->useMedian); 	      	
 	    }
@@ -1999,7 +2001,7 @@ static void broadcastRatesFewPartitions(tree *tr)
   HYBRID_BCAST_VAR(tr, patratStored, tr->originalCrunchedLength, MPI_DOUBLE, double); 
   
   for(model = 0; model < tr->NumberOfModels; model++)
-    { 
+    {
       HYBRID_BCAST_VAR_1(tr, partitionData[model].numberOfCategories, MPI_INT); 
       HYBRID_BCAST_VAR(tr, partitionData[model].perSiteRates, tr->partitionData[model].numberOfCategories,MPI_DOUBLE, double); 
     }

@@ -29,6 +29,7 @@
  */
 
 
+#include "config.h"
 #include "axml.h"
 #include "tree.h" 
 #include "thread.h"
@@ -527,7 +528,7 @@ static int mygetopt(int argc, char **argv, char *opts, int *optind, char **optar
 
 static void printVersionInfo(void)
 {
-  printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  programName, programVersion, programDate); 
+  printf("\n\nThis is %s version %s released by Alexandros Stamatakis on %s.\n\n",  PACKAGE_NAME, VERSION, "TODO"); 
 }
 
 static void printMinusFUsage(void)
@@ -1005,8 +1006,8 @@ static void makeFileNames(tree *tr)
       printf("ExaML output files with the run ID <%s> already exist \n", run_id);
       printf("in directory %s ...... exiting\n", workdir);    
 
-#ifndef _NOT_PRODUCTIVE
-      errorExit(-1,NULL);	
+#if PRODUCTIVE == 1 
+      errorExit(-1,NULL);
 #endif
     }
 }
@@ -1025,7 +1026,7 @@ static void makeFileNames(tree *tr)
 /********************PRINTING various INFO **************************************/
 
 
-/* #ifndef  _NOT_PRODUCTIVE */
+
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
   if(ABS_ID(tr->threadId) == 0)
