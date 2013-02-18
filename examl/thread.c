@@ -11,6 +11,7 @@ int ABS_ID(int num)
 }
 
 
+
 int ABS_NUM_RANK()
 {
   assert(mpiState.numberOfThreads > 0); 
@@ -48,9 +49,12 @@ extern int realMain(int tid, int argc, char *argv[]);
 static void* realMainThreadWrapper(void *tmp)
 {
   threadData *tData = (threadData*) tmp; 
+  
+  /* printf("\n\n%d enters wrapper\n\n", tData->tid);  */
 
   realMain(tData->tid ,tData->argc, tData->argv); 
 
+  printf("\n\nAttention: thread %d exits\n\n", tData->tid); 
   pthread_exit(NULL); 
   return NULL; 
 }
@@ -61,12 +65,12 @@ static void* realMainThreadWrapper(void *tmp)
  */
 void startPthreads(int argc, char *argv[])
 {
-  pthread_attr_t attr;
+  pthread_attr_t* attr = malloc(sizeof(pthread_attr_t));
   int rc, t;
   threadData *tData;
 
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_init(attr);
+  /* pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED); */
 
   mpiState.threads    = (pthread_t *)malloc(mpiState.numberOfThreads * sizeof(pthread_t));
   tData      = (threadData *)malloc(mpiState.numberOfThreads * sizeof(threadData));
@@ -78,7 +82,6 @@ void startPthreads(int argc, char *argv[])
   mpiState.threadsAreLocked = FALSE; 
 
   mpiState.allTrees = calloc(mpiState.numberOfThreads, sizeof(tree*)); 
-  
 
   for(t = 1; t < mpiState.numberOfThreads; t++)
   {
@@ -86,14 +89,18 @@ void startPthreads(int argc, char *argv[])
     tData[t].argc  = argc;
     tData[t].argv  = argv;
 
-    rc = pthread_create(&(mpiState.threads[t]), &attr, realMainThreadWrapper, (void *)(&tData[t]));
+    rc = pthread_create(&(mpiState.threads[t]), attr, realMainThreadWrapper, (void *)(&tData[t]));
+
     if(rc)
       {
 	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	exit(-1);
-      }
+      } 
+    
+    while(mpiState.localGen[t] != 1) ; 
   }
 }
+
 
 void tb_workerTrap(tree *tr)
 {
@@ -103,19 +110,19 @@ void tb_workerTrap(tree *tr)
       mpiState.localGen[tr->threadId]++; 
       const int myGen = mpiState.localGen[tr->threadId]; 
       
-      int sum; 
+      int sum;
       do 
 	{
 	  sum = 0; 
 	  for(int i = 0; i < mpiState.numberOfThreads; ++i)
 	    if(myGen == mpiState.localGen[i])
 	      sum++; 
-	} while(sum != mpiState.numberOfThreads);       
+	} while(sum != mpiState.numberOfThreads); 
       mpiState.threadsAreLocked = TRUE; 
     }
   else 
     {      
-      mpiState.localGen[ tr->threadId ] ++; 
+      mpiState.localGen[ tr->threadId ]++; 
       const int myGen = mpiState.localGen[tr->threadId]; 
       while(myGen != mpiState.globalGen); 
     }

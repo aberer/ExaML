@@ -35,6 +35,9 @@
 /* Support MMX instructions */
 #define HAVE_MMX /**/
 
+/* Define if you have the MPI library. */
+/* #undef HAVE_MPI */
+
 /* Define to 1 if you have the `pow' function. */
 #define HAVE_POW 1
 
@@ -115,7 +118,7 @@
 #define PACKAGE_VERSION "1.0.1"
 
 /* "is 1, if in productive mode " */
-#define PRODUCTIVE 0
+#define PRODUCTIVE 1
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1

@@ -40,6 +40,8 @@
 /*#include <tmmintrin.h>*/
 #endif
 
+
+
 #include "thread.h"
 
 #include "faultTolerance.h"
@@ -733,8 +735,46 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   
   evaluateIterative(tr);  
   
-  HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double); 
-  
+  HYBRID_ALLREDUCE_VAR(tr, perPartitionLH, tr->NumberOfModels, MPI_DOUBLE, double);
+
+  /* START */
+
+  /* if(tr->threadId == 0) */
+  /*   { */
+  /*     tb_workerTrap(tr); */
+      
+  /*     for(int model = 0; model < tr->NumberOfModels; ++model) */
+  /* 	{ */
+  /* 	  int toRank =  tr->partitionAssignment[model] / mpiState.numberOfThreads; */
+  /* 	  int toThread = ( tr->partitionAssignment[model] % mpiState.numberOfThreads ); */
+
+  /* 	  if(toRank == mpiState.rank) */
+  /* 	    tr->perPartitionLH[model] = GET_TREE_NUM( toThread )->perPartitionLH[model]; */
+  /* 	} */
+      
+  /*     MPI_Allreduce(MPI_IN_PLACE , tr->perPartitionLH , tr->NumberOfModels, MPI_DOUBLE, MPI_SUM, mpiState.comm); */
+      
+  /*     tb_releaseWorkers(tr); */
+
+  /*     /\* for(int i = 1; i < mpiState.numberOfThreads; ++i) *\/ */
+  /* 	/\* memcpy(GET_TREE_NUM(i)->perPartitionLH, MASTER_TREE->perPartitionLH, sizeof(double) * tr->NumberOfModels); *\/ */
+  /*     tb_workerTrap(tr); */
+  /*     tb_releaseWorkers(tr); */
+
+  /*   } */
+  /* else */
+  /*   { */
+  /*     tb_workerTrap(tr); */
+      
+  /*     memcpy(tr->perPartitionLH, MASTER_TREE->perPartitionLH, sizeof(double) * tr->NumberOfModels);  */
+      
+  /*     tb_workerTrap(tr); */
+  /*   } */
+
+  /* END */
+
+
+
 #ifdef _USE_RTS
   assert(0); 
   mpiState.commPhase = PHASE_LNL_EVAL; 
@@ -755,10 +795,10 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
 
   tr->td[0].traversalHasChanged = FALSE;  
 
-#ifdef _MEASURE_TIME
-  if(ABS_ID(tr->threadId) == 0 )
-    DM(tr , "evaluateGeneric took %f\n" , gettime()-time); 
-#endif
+/* #ifdef _MEASURE_TIME */
+/*   if(ABS_ID(tr->threadId) == 0 ) */
+/*     DM(tr , "evaluateGeneric took %f\n" , gettime()-time);  */
+/* #endif */
 }
 
 

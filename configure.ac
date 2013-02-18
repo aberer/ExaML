@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.68])
 AC_INIT([examl], [1.0.1], [bla@bla.org])
 AC_CONFIG_SRCDIR([examl/axml.c])
 AC_CONFIG_HEADERS([examl/config.h])
@@ -9,6 +9,7 @@ AC_CONFIG_HEADERS([examl/config.h])
 AM_INIT_AUTOMAKE(  examl  , 1.0.1 )
 
 AM_SILENT_RULES([yes])
+
 
 
 # Checks for programs.
@@ -34,6 +35,7 @@ AC_FUNC_REALLOC
 AC_CHECK_FUNCS([getcwd gettimeofday memset pow sqrt strcasecmp strchr])
 
 AX_EXT
+AX_PROG_CC_MPI
 
 AC_ARG_ENABLE(debug,
   [ --enable-debug    compile with debug information and  less optimization ],

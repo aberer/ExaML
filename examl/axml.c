@@ -452,7 +452,7 @@ static int modelExists(char *model, tree *tr)
 
 
 
-static int mygetopt(int argc, char **argv, char *opts, int *optind, char **optarg)
+static int mygetopt(int argc,  char **argv,  char *opts, int *optind, char **optarg)
 {
   static int sp = 1;
   register int c;
@@ -947,7 +947,6 @@ int errorExit(int e, tree *tr)
       int i; 
       for(i = 1; i < mpiState.numberOfThreads; ++i)
 	{
-	  pthread_detach(mpiState.threads[tr->threadId]);
 	  pthread_join(mpiState.threads[i],NULL); 
 	}
 #endif
@@ -1354,7 +1353,7 @@ void makeItUntilHere(tree *tr)
   printf("SUCCESS %d/%d\n", ABS_ID(tr->threadId), ABS_NUM_RANK());
   fflush(stdout);
   HYBRID_BARRIER(tr);
-  errorExit(0,tr);   
+  errorExit(0,tr); 
 }
 
 
@@ -1390,38 +1389,43 @@ void isnanCheck(double *v)
 int realMain(int tid, int argc, char *argv[])
 {  
   tree *tr = calloc(1,sizeof(tree));  
-  analdef *adef = calloc(1,sizeof(analdef)); 
+  tr->threadId = tid;
 
-  ignoreDenormFloats();
+  analdef *adef = calloc(1,sizeof(analdef)); 
 
   initAdef(adef);
 
   /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
   get_args(argc, argv, adef, tr); 
 
-  tr->threadId = tid;
+
+  /* this is a weird hack  */
+  mpiState.localGen[tid] = 1; 
+  if(tid == 0)
+    mpiState.globalGen = 1;
 
   DM(tr, " my abs num is %d\n", ABS_ID(tr->threadId)); 
 
+  mpiState.allTrees[tr->threadId] = tr; 
 
   /* generate the ExaML output file names and store them in strings */  
   if(ABS_ID(tr->threadId) == 0)
     makeFileNames(tr);  
 
-  mpiState.allTrees[tr->threadId] = tr; 
-
-  tb_workerTrap(tr); 
+  tb_workerTrap(tr);
   if(tr->threadId == 0)
     tb_releaseWorkers(tr) ;
 
   initializeTree(tr, adef); 
 
+#if (PRODUCTIVE == 1  ) 
   if(ABS_ID(tr->threadId) == 0)  
     {
-      printModelAndProgramInfo(tr, adef, argc, argv);  
+      printModelAndProgramInfo(tr, adef, argc, argv);
       printBothOpen(tr,"Memory Saving Option: %s\n", (tr->saveMemory == TRUE)?"ENABLED":"DISABLED");   	             
     }  
 
+#endif
   /* 
      this will re-start ExaML exactly where it has left off from a checkpoint file,
      while checkpointing is important and has to be implemented for the library we should not worry about this right now 
@@ -1484,7 +1488,6 @@ int realMain(int tid, int argc, char *argv[])
   if(ABS_ID(tr->threadId) == 0 )
     finalizeInfoFile(tr, adef);
 
-
   return errorExit(EXIT_SUCCESS,tr); 
 }
 
@@ -1530,7 +1533,6 @@ static void examl_initMPI(int argc, char **argv)
 
   peekNumberOfThreads(argc,argv);
 
-
   mpiState.allTrees = (tree**)calloc(mpiState.numberOfThreads, sizeof(tree*)); 
  
 #ifdef _USE_RTS
@@ -1548,6 +1550,8 @@ int main(int argc, char *argv[])
   int
     err; 
 
+  ignoreDenormFloats();
+
   examl_initMPI(argc, argv);
 
   masterTime = gettime();         
@@ -1557,7 +1561,8 @@ int main(int argc, char *argv[])
 #endif
 
   err = realMain(0, argc, argv); 
-  /* errorExit(err, NULL); */
+
+  /* tb_workerTrap(tr); */
 
   return err; 
 }
