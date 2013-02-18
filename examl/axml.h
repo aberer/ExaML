@@ -63,7 +63,7 @@
 
 #include "genericData.h"
 
-#ifdef __AVX
+#ifdef HAVE_AVX
 #define BYTE_ALIGNMENT 32
 #else
 #define BYTE_ALIGNMENT 16
@@ -1202,7 +1202,7 @@ extern void restart(tree *tr);
 
 
 
-#ifdef __AVX
+#ifdef HAVE_AVX
 extern void newviewGTRCAT_AVX(int tipCase,  double *EV,  int *cptr,
 			      double *x1_start, double *x2_start,  double *x3_start, double *tipVector,
 			      unsigned char *tipX1, unsigned char *tipX2,
@@ -1338,7 +1338,7 @@ extern void isnanCheck(double *v);
 
 
 extern void DM(tree *tr, const char *format, ...) ; 
-
+extern void DMT(tree *tr, const char *format, ...); 
 
 extern void resetBranches(tree *tr); 
 extern int isThisHisPartition(tree *tr,  int model, int threadNum);

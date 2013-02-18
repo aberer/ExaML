@@ -94,10 +94,9 @@ void *malloc_aligned(size_t size)
   if(ptr == (void*)NULL) 
    assert(0);
   
-#ifdef __AVX
+#ifdef HAVE_AVX
   assert(0);
 #endif
-
 
 #else
   res = posix_memalign( &ptr, BYTE_ALIGNMENT, size );
@@ -1570,6 +1569,19 @@ int main(int argc, char *argv[])
 void DM(tree *tr, const char *format, ...)
 {
   printf("[%d/%d = %d] ", mpiState.rank, tr->threadId , ABS_ID(tr->threadId)); 
+  va_list args; 
+  va_start(args, format); 
+  vprintf(format, args); 
+  va_end(args);   
+}
+
+
+/**
+   @brief a convenient hybrid debug message, also measures time 
+*/
+void DMT(tree *tr, const char *format, ...)
+{
+  printf("[%d/%d = %d],(%f) ", mpiState.rank, tr->threadId , ABS_ID(tr->threadId), gettime()- masterTime); 
   va_list args; 
   va_start(args, format); 
   vprintf(format, args); 

@@ -2620,6 +2620,11 @@ static void autoProtein(tree *tr)
 
 void modOpt(tree *tr, double likelihoodEpsilon)
 { 
+#ifdef _MEASURE_TIME
+  if(ABS_ID(tr->threadId) == 0)
+    DMT(tr, "started modopt\n "); 
+#endif
+
   int 
     i, 
     catOpt = 0,
@@ -2684,5 +2689,10 @@ void modOpt(tree *tr, double likelihoodEpsilon)
   freeLinkageList(alphaList);
   freeLinkageList(rateList);
   freeLinkageList(invarList);  
+
+#ifdef _MEASURE_TIME
+  if(ABS_ID(tr->threadId) == 0)
+    DMT(tr, "finished modopt\n "); 
+#endif
 }
 

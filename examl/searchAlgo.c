@@ -1159,8 +1159,14 @@ static void writeCheckpoint(tree *tr)
 
   fclose(f); 
 
+#ifdef _MEASURE_TIME
+  DMT(tr,"Checkpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood); 
+#else 
   printBothOpen(tr,"\nCheckpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood);
+#endif
 }
+
+
 
 static void readTree(tree *tr, FILE *f)
 {
@@ -1566,7 +1572,9 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   bestlist 
     *bestML,
     *bestT, 
-    *bt;        
+    *bt;  
+  
+  
  
   /* now here is the RAxML hill climbing search algorithm */
   
@@ -1613,6 +1621,11 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
   */
 
   tr->Thorough = 0;     
+
+#ifdef _MEASURE_TIME
+  if(ABS_ID(tr->threadId) == 0)
+    DMT(tr, "finished setup\n "); 
+#endif
   
   /* if we are not using a checkpoint and estimateModel is set to TRUE we call the function 
      that optimizes model parameters, such as the CAT model assignment, the alpha paremeter
@@ -1628,8 +1641,6 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       else
 	treeEvaluate(tr, 2);  
     }
-
-  
 
   /* print some stuff to the RAxML_log file */  
   printLog(tr); 
@@ -1671,7 +1682,8 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
       else
 	treeEvaluate(tr, 1);   
     }
-  
+
+
   /* save the current tree again, while the topology has not changed, the branch lengths have changed in the meantime, hence
      we need to store them again */
 

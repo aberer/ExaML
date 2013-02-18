@@ -1075,7 +1075,7 @@ void newviewIterative (tree *tr, int startIndex)
 					   width, left, right, wgt, &scalerIncrement, x1_gap, x2_gap, x3_gap,
 					   x1_gapColumn, x2_gapColumn, x3_gapColumn, tr->maxCategories);
 		      else
-#ifdef __AVX
+#ifdef HAVE_AVX
 			newviewGTRCAT_AVX(tInfo->tipCase,  tr->partitionData[model].EV, tr->partitionData[model].rateCategory,
 					  x1_start, x2_start, x3_start, tr->partitionData[model].tipVector,
 					  tipX1, tipX2,
@@ -1099,7 +1099,7 @@ void newviewIterative (tree *tr, int startIndex)
 						     x1_gap, x2_gap, x3_gap, 
 						     x1_gapColumn, x2_gapColumn, x3_gapColumn);
 		       else
-#ifdef __AVX
+#ifdef HAVE_AVX
 			 newviewGTRGAMMA_AVX(tInfo->tipCase,
 					     x1_start, x2_start, x3_start, tr->partitionData[model].EV, tr->partitionData[model].tipVector,
 					     tipX1, tipX2,
@@ -1125,7 +1125,7 @@ void newviewIterative (tree *tr, int startIndex)
 					       tipX1, tipX2, width, left, right, wgt, &scalerIncrement, x1_gap, x2_gap, x3_gap,
 					       x1_gapColumn, x2_gapColumn, x3_gapColumn, tr->maxCategories);
 		      else
-#ifdef __AVX
+#ifdef HAVE_AVX
 			newviewGTRCATPROT_AVX(tInfo->tipCase,  tr->partitionData[model].EV, tr->partitionData[model].rateCategory,
 					      x1_start, x2_start, x3_start, tr->partitionData[model].tipVector,
 					      tipX1, tipX2, width, left, right, wgt, &scalerIncrement);
@@ -1150,7 +1150,7 @@ void newviewIterative (tree *tr, int startIndex)
 							    x1_gap, x2_gap, x3_gap,
 							    x1_gapColumn, x2_gapColumn, x3_gapColumn);
 			  else
-#ifdef __AVX
+#ifdef HAVE_AVX
 			    newviewGTRGAMMAPROT_AVX(tInfo->tipCase,
 						    x1_start, x2_start, x3_start, tr->partitionData[model].EV, tr->partitionData[model].tipVector,
 						    tipX1, tipX2,

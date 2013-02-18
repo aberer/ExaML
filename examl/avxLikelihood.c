@@ -1,5 +1,6 @@
 
 #include "config.h"
+
 #ifdef HAVE_AVX
 
 #include "axml.h"
