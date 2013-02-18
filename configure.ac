@@ -45,7 +45,7 @@ AC_ARG_ENABLE(debug,
 )
 AM_CONDITIONAL([WITH_DEBUG], [test  "x$WITH_DEBUG" = "xyes"])
 
-
+AM_CONDITIONAL([WITH_AVX], [test "$ax_cv_have_avx_ext" = "xyes" ] ) 
 
 AC_ARG_ENABLE(productive,
   [ --disable-productive    developmental version of the code ],

@@ -626,6 +626,8 @@ am__EXEEXT_TRUE
 LTLIBOBJS
 PRODUCTIVE_FALSE
 PRODUCTIVE_TRUE
+WITH_AVX_FALSE
+WITH_AVX_TRUE
 WITH_DEBUG_FALSE
 WITH_DEBUG_TRUE
 SIMD_FLAGS
@@ -5171,6 +5173,13 @@ else
 fi
 
 
+ if test "$ax_cv_have_avx_ext" = "xyes"  ; then
+  WITH_AVX_TRUE=
+  WITH_AVX_FALSE='#'
+else
+  WITH_AVX_TRUE='#'
+  WITH_AVX_FALSE=
+fi
 
 
 # Check whether --enable-productive was given.
@@ -5339,6 +5348,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${WITH_DEBUG_TRUE}" && test -z "${WITH_DEBUG_FALSE}"; then
   as_fn_error $? "conditional \"WITH_DEBUG\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WITH_AVX_TRUE}" && test -z "${WITH_AVX_FALSE}"; then
+  as_fn_error $? "conditional \"WITH_AVX\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${PRODUCTIVE_TRUE}" && test -z "${PRODUCTIVE_FALSE}"; then
