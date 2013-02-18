@@ -1455,6 +1455,11 @@ int realMain(int tid, int argc, char *argv[])
 
       getStartingTree(tr); 
 
+#ifdef _MEASURE_TIME
+      if(ABS_ID(tr->threadId) == 0)
+	DMT(tr, "read tree => starting to evaluate\n"); 
+#endif
+
       switch(adef->mode)
 	{
 	case TREE_EVALUATION: 	  
@@ -1465,9 +1470,9 @@ int realMain(int tid, int argc, char *argv[])
 	      printResult(tr, adef, TRUE); 
 	    }
 	  break; 
-	case BIG_RAPID_MODE:
+	case BIG_RAPID_MODE:	  
 	  evaluateGeneric(tr, tr->start, TRUE); 
-	  treeEvaluate(tr, 1); 
+	  treeEvaluate(tr, 1);
 	  computeBIGRAPID(tr, adef, TRUE); 
 	  break; 
 	default:
@@ -1524,10 +1529,6 @@ static void examl_initMPI(int argc, char **argv)
   mpiState.generation[PHASE_RATE_OPT] = 0;
 
   peekNumberOfThreads(argc,argv);
-
-#ifdef _HYBRID
-  pthread_barrier_init(&(mpiState.pBarrier), NULL, mpiState.numberOfThreads);
-#endif
 
 
   mpiState.allTrees = (tree**)calloc(mpiState.numberOfThreads, sizeof(tree*)); 

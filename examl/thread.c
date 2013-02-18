@@ -96,28 +96,28 @@ void startPthreads(int argc, char *argv[])
 }
 
 void tb_workerTrap(tree *tr)
-{    
+{
   if(tr->threadId == 0)
     {
       assert(NOT mpiState.threadsAreLocked); 
-      volatile int *myPtr = mpiState.localGen + tr->threadId; 
-      (*myPtr)++; 
+      mpiState.localGen[tr->threadId]++; 
+      const int myGen = mpiState.localGen[tr->threadId]; 
+      
       int sum; 
       do 
 	{
 	  sum = 0; 
 	  for(int i = 0; i < mpiState.numberOfThreads; ++i)
-	    if(*myPtr == mpiState.localGen[i])
+	    if(myGen == mpiState.localGen[i])
 	      sum++; 
 	} while(sum != mpiState.numberOfThreads);       
       mpiState.threadsAreLocked = TRUE; 
     }
   else 
     {      
-      volatile int
-	*myPtr = mpiState.localGen + tr->threadId; 
-      (*myPtr)++; 
-      while(*myPtr != mpiState.globalGen); 
+      mpiState.localGen[ tr->threadId ] ++; 
+      const int myGen = mpiState.localGen[tr->threadId]; 
+      while(myGen != mpiState.globalGen); 
     }
 }
 

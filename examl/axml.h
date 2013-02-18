@@ -1325,7 +1325,7 @@ typedef struct _mpiState
 
   pthread_t *threads; 
   tree **allTrees; 
-  pthread_barrier_t pBarrier; 
+  /* pthread_barrier_t pBarrier;  */
 #endif
   
 } examl_MPI_State; 

@@ -13,7 +13,7 @@ CXXFLAGS=
 FEATURE_FLAGS=-D_USE_ALLREDUCE -D_HYBRID -D_MEASURE_TIME
 
 
-AM_CFLAGS=-D__SIM_SSE3 -msse3 -D_GNU_SOURCE  -D_OPTIMIZED_FUNCTIONS
+AM_CFLAGS=-D__SIM_SSE3 -D_GNU_SOURCE  -D_OPTIMIZED_FUNCTIONS  $(SIMD_FLAGS)
 
 if WITH_DEBUG
 AM_CFLAGS+=-g3 -O0
@@ -39,6 +39,5 @@ exaML_SOURCES= examl/axml.c  examl/evaluatePartialGenericSpecial.c examl/generic
 
 
 if WITH_AVX
- AM_CFLAGS += -mavx 
  exaML_SOURCES +=  examl/avxLikelihood.c
 endif

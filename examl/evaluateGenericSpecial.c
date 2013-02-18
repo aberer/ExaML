@@ -660,7 +660,15 @@ void evaluateIterative(tree *tr)
 
 
 void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
-{
+{  
+  double time = gettime(); 
+
+
+/* #ifdef _MEASURE_TIME */
+/*   if(ABS_ID(tr->threadId) == 0 ) */
+/*     DMT(tr, "starting evaluate generic \n");  */
+/* #endif */
+
   /* now this may be the entry point of the library to compute 
      the log like at a branch defined by p and p->back == q */
 
@@ -746,6 +754,11 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   /* do some bookkeeping to have traversalHasChanged in a consistent state */
 
   tr->td[0].traversalHasChanged = FALSE;  
+
+#ifdef _MEASURE_TIME
+  if(ABS_ID(tr->threadId) == 0 )
+    DM(tr , "evaluateGeneric took %f\n" , gettime()-time); 
+#endif
 }
 
 

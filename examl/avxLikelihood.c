@@ -1,8 +1,4 @@
 
-#include "config.h"
-
-#ifdef HAVE_AVX
-
 #include "axml.h"
 
 #include <xmmintrin.h>
@@ -1298,11 +1294,3 @@ void newviewGTRGAMMAPROT_AVX(int tipCase,
   *scalerIncrement = addScale;
 }
 
-#else 
-
-void dummyFunction()
-{
-}
-
-
-#endif

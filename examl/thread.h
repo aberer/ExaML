@@ -41,7 +41,7 @@ inline int ABS_NUM_RANK()
       {									\
 	type *buf = calloc(length, sizeof(type)) ;			\
 									\
-	tb_workerTrap(tr);				\
+	tb_workerTrap(tr);						\
   									\
 	for(int i = 0; i < length;++i)					\
 	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\

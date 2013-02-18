@@ -2665,7 +2665,7 @@ void modOpt(tree *tr, double likelihoodEpsilon)
 	case GAMMA:      
 	  optAlpha(tr, modelEpsilon, alphaList); 
 
-	  evaluateGeneric(tr, tr->start, TRUE); 	 	 
+	  evaluateGeneric(tr, tr->start, TRUE); 
 	  
 	  treeEvaluate(tr, 0.1);	  	 
 	 

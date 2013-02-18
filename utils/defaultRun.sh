@@ -1,6 +1,6 @@
 #! /bin/bash
 
-model=" -m GAMMA -M "
+model=" -m GAMMA "
 # FT="-am ft-enable-mpi"
 FT=""
 
