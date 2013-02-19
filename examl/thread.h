@@ -35,31 +35,55 @@ inline int ABS_NUM_RANK()
 /* :TODO: not very efficient, is it?  */
 
 /** @notice only works with sums, but that is okay  */
-#define HYBRID_ALLREDUCE_VAR(tr, tree_var, length, mpi_type, type)	\
+#define HYBRID_ALLREDUCE_VAR_ONE_BARRIER(tr, tree_var, length, mpi_type, type)	\
   {									\
     if(tr->threadId == 0)						\
       {									\
-	type *buf = calloc(length, sizeof(type)) ;			\
-									\
 	tb_workerTrap(tr);						\
   									\
 	for(int i = 0; i < length;++i)					\
 	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
 	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i];		\
-  									\
-	MPI_Allreduce(tr->tree_var, buf, length, mpi_type, MPI_SUM, mpiState.comm); \
+					 				\
+	MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
 									\
-	for(int j = 0; j < mpiState.numberOfThreads; ++j)		\
-	  memcpy(GET_TREE_NUM(j)->tree_var, buf, sizeof(type) * length); \
+	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
+	  memcpy(GET_TREE_NUM(i)->tree_var, MASTER_TREE->tree_var,sizeof(type) * length); \
 									\
 	tb_releaseWorkers(tr);						\
-	free(buf);							\
+      }									\
+    else								\
+      tb_workerTrap(tr);						\
+  }									\
+
+
+#define HYBRID_ALLREDUCE_VAR_TWO_BARRIERS(tr, tree_var, length, mpi_type, type)	\
+  {									\
+    if(tr->threadId == 0)						\
+      {									\
+	tb_workerTrap(tr);						\
+  									\
+	for(int i = 0; i < length;++i)					\
+	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
+	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i];		\
+					 				\
+	MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
+	tb_releaseWorkers(tr);						\
+	tb_workerTrap(tr);						\
+	tb_releaseWorkers(tr);						\
       }									\
     else								\
       {									\
 	tb_workerTrap(tr);						\
+	memcpy(tr->tree_var, MASTER_TREE->tree_var, sizeof(type) * length); \
+	tb_workerTrap(tr);						\
       }									\
   }									\
+
+
+
+#define HYBRID_ALLREDUCE_VAR HYBRID_ALLREDUCE_VAR_TWO_BARRIERS 
+
 
 
 /* TODO 

@@ -34,10 +34,15 @@ AM_CXXFLAGS=$(AM_CFLAGS)
 AM_LDFLAGS = -lm
 CC=mpicc
 
-bin_PROGRAMS=exaML
-exaML_SOURCES= examl/axml.c  examl/evaluatePartialGenericSpecial.c examl/genericData.c examl/models.c examl/optimizeModel.c examl/searchAlgo.c examl/topologies.c examl/treeIO.c  examl/evaluateGenericSpecial.c  examl/faultTolerance.c examl/makenewzGenericSpecial.c examl/newviewGenericSpecial.c examl/restartHashTable.c examl/thread.c examl/tree.c examl/bipartitionList.c
+bin_PROGRAMS=exaML parser
 
+# how to cook examl  
+exaML_SOURCES= examl/axml.c  examl/evaluatePartialGenericSpecial.c examl/genericData.c examl/models.c examl/optimizeModel.c examl/searchAlgo.c examl/topologies.c examl/treeIO.c  examl/evaluateGenericSpecial.c  examl/faultTolerance.c examl/makenewzGenericSpecial.c examl/newviewGenericSpecial.c examl/restartHashTable.c examl/thread.c examl/tree.c examl/bipartitionList.c
 
 if WITH_AVX
  exaML_SOURCES +=  examl/avxLikelihood.c
 endif
+
+
+parser_CFLAGS= -D_GNU_SOURCE -O2 -fomit-frame-pointer -funroll-loops
+parser_SOURCES=parser-src/axml-parser.c  parser-src/parsePartitions-parser.c

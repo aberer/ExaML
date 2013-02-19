@@ -325,8 +325,8 @@ FILE *myfopen(const char *path, const char *mode)
 	return fp;
       else
 	{	  
-	    printf("The file %s ExaML wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
-		   path, mode);
+	    printf("The file %s %s wants to open for writing or appending can not be opened [mode: %s], exiting ...\n",
+		   path, PACKAGE_NAME, mode);
 	  errorExit(-1,NULL);
 	  return (FILE *)NULL;
 	}
@@ -583,7 +583,7 @@ static void printREADME(void)
       printf("\n");
       printf("      -B      specify the number of best ML trees to save and print to file\n");
       printf("\n");
-      printf("      -c      Specify number of distinct rate catgories for ExaML when modelOfEvolution\n");
+      printf("      -c      Specify number of distinct rate catgories for %s when modelOfEvolution\n", PACKAGE_NAME);
       printf("              is set to GTRPSR\n");
       printf("              Individual per-site rates are categorized into numberOfCategories rate \n");
       printf("              categories to accelerate computations. \n");
@@ -641,7 +641,7 @@ static void printREADME(void)
       printf("\n");
       printf("      -v      Display version information\n");
       printf("\n");
-      printf("      -w      FULL (!) path to the directory into which ExaML shall write its output files\n");
+      printf("      -w      FULL (!) path to the directory into which %s shall write its output files\n", PACKAGE_NAME);
       printf("\n");
       printf("              DEFAULT: current directory\n");  
       printf("\n\n\n\n");
@@ -950,7 +950,7 @@ int errorExit(int e, tree *tr)
 	  pthread_join(mpiState.threads[i],NULL); 
 	}
 #endif
-      printf("all threads have finished!\n"); 
+      /* printf("all threads have finished!\n");  */
 
       if(e == 0 )
 	{
@@ -966,7 +966,7 @@ int errorExit(int e, tree *tr)
     }
   else    
     {       
-      printf("thread %d finishes \n", tr->threadId); 
+      /* printf("thread %d finishes \n", tr->threadId);  */
       pthread_exit(&(mpiState.exitCodes[tr->threadId]));
     }  
 
@@ -986,11 +986,16 @@ static void makeFileNames(tree *tr)
   strcpy(logFileName,          workdir);  
   strcpy(infoFileName,         workdir);
   strcpy(binaryCheckpointName, workdir);
+
+  strcat(resultFileName,      PACKAGE_NAME);
+  strcat(logFileName,         PACKAGE_NAME);  
+  strcat(infoFileName,         PACKAGE_NAME);
+  strcat(binaryCheckpointName, PACKAGE_NAME);  
    
-  strcat(resultFileName,       "ExaML_result.");
-  strcat(logFileName,          "ExaML_log.");  
-  strcat(infoFileName,         "ExaML_info.");
-  strcat(binaryCheckpointName, "ExaML_binaryCheckpoint.");
+  strcat(resultFileName,       "_result.");
+  strcat(logFileName,          "_log.");  
+  strcat(infoFileName,         "_info.");
+  strcat(binaryCheckpointName, "_binaryCheckpoint.");
   
   strcat(resultFileName,       run_id);
   strcat(logFileName,          run_id);  
@@ -1001,7 +1006,7 @@ static void makeFileNames(tree *tr)
 
   if(infoFileExists)
     {
-      printf("ExaML output files with the run ID <%s> already exist \n", run_id);
+      printf("%s output files with the run ID <%s> already exist \n", PACKAGE_NAME, run_id);
       printf("in directory %s ...... exiting\n", workdir);    
 
 #if PRODUCTIVE == 1 
@@ -1039,14 +1044,9 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       else
 	strcpy(modelType, "GAMMA");   
      
-      printBoth(tr, infoFile, "\n\nThis is %s version %s released by Alexandros Stamatakis in %s.\n\n",  programName, programVersion, programDate);
+      printBoth(tr, infoFile, "\n\nThis is %s version %s released by Alexandros Stamatakis in %s.\n\n",  PACKAGE_NAME, VERSION, "TODO");           
      
-      
-      
-     
-      printBoth(tr,infoFile, "\nAlignment has %d distinct alignment patterns\n\n",  tr->originalCrunchedLength);
-      
-     
+      printBoth(tr,infoFile, "\nAlignment has %d distinct alignment patterns\n\n",  tr->originalCrunchedLength);     
       
       printBoth(tr,infoFile, "Proportion of gaps and completely undetermined characters in this alignment: %3.2f%s\n", 100.0 * tr->gapyness, "%"); 
       
@@ -1054,33 +1054,22 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       switch(adef->mode)
 	{	
 	case  BIG_RAPID_MODE:	 
-	  printBoth(tr, infoFile, "\nExaML rapid hill-climbing mode\n\n");
+	  printBoth(tr, infoFile, "\n%s rapid hill-climbing mode\n\n", PACKAGE_NAME);
 	  break;	
 	case TREE_EVALUATION: 
-	  printBoth(tr, infoFile, "\nExaML Model Optimization up to an accuracy of %f log likelihood units\n\n", adef->likelihoodEpsilon);
+	  printBoth(tr, infoFile, "\n%s Model Optimization up to an accuracy of %f log likelihood units\n\n", PACKAGE_NAME, adef->likelihoodEpsilon);
 	  break; 
 	default:
 	  assert(0);
 	}
-
      
-	  
       if(adef->perGeneBranchLengths)
 	printBoth(tr, infoFile, "Using %d distinct models/data partitions with individual per partition branch length optimization\n\n\n", tr->NumberOfModels);
       else
 	printBoth(tr, infoFile, "Using %d distinct models/data partitions with joint branch length optimization\n\n\n", tr->NumberOfModels);	
-	
 
-      
+      printBoth(tr, infoFile, "All free model parameters will be estimated by %s\n", PACKAGE_NAME);
      
-
-
-      
-      
-      printBoth(tr, infoFile, "All free model parameters will be estimated by ExaML\n");
-      
-     
-	
       if(tr->rateHetModel == GAMMA || tr->rateHetModel == GAMMA_I)
 	printBoth(tr, infoFile, "%s model of rate heteorgeneity, ML estimate of alpha-parameter\n\n", modelType);
       else
@@ -1161,7 +1150,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       
       printBoth(tr, infoFile, "\n");
 
-      printBoth(tr, infoFile, "ExaML was called as follows:\n\n");
+      printBoth(tr, infoFile, "%s was called as follows:\n\n", PACKAGE_NAME);
       for(i = 0; i < argc; i++)
 	printBoth(tr, infoFile,"%s ", argv[i]);
       printBoth(tr, infoFile,"\n\n\n");
@@ -1398,13 +1387,14 @@ int realMain(int tid, int argc, char *argv[])
   /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
   get_args(argc, argv, adef, tr); 
 
-
-  /* this is a weird hack  */
+  /* this is a weird hack: I have to ensure, that all processes are
+     started correctly in startpthreads (by setting the gen counter),
+     here w e correct for that and release the workers */
   mpiState.localGen[tid] = 1; 
   if(tid == 0)
     mpiState.globalGen = 1;
 
-  DM(tr, " my abs num is %d\n", ABS_ID(tr->threadId)); 
+  /* DM(tr, " my abs num is %d\n", ABS_ID(tr->threadId));  */
 
   mpiState.allTrees[tr->threadId] = tr; 
 

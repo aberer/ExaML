@@ -1,14 +1,14 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.68])
-AC_INIT([examl], [1.0.1], [bla@bla.org])
+AC_PREREQ([2.69])
+AC_INIT([ExaML],[1.0.1],[bla@bla.org])
 AC_CONFIG_SRCDIR([examl/axml.c])
 AC_CONFIG_HEADERS([examl/config.h])
 
 AM_INIT_AUTOMAKE(  examl  , 1.0.1 )
 
-AM_SILENT_RULES([yes])
+dnl AM_SILENT_RULES([yes])
 
 
 
@@ -65,5 +65,5 @@ AS_IF([test "x$PRODUCTIVE" = "xyes"], AC_DEFINE(PRODUCTIVE, 1) )
 AM_CONDITIONAL([PRODUCTIVE], [test  "x$PRODUCTIVE" = "xyes"])
 
 
-AC_CONFIG_FILES([Makefile ]) # TODO parser/Makefile 
+AC_CONFIG_FILES([Makefile]) # TODO parser/Makefile 
 AC_OUTPUT

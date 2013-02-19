@@ -103,10 +103,10 @@
 #define PACKAGE_BUGREPORT "bla@bla.org"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "examl"
+#define PACKAGE_NAME "ExaML"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "examl 1.0.1"
+#define PACKAGE_STRING "ExaML 1.0.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "examl"
