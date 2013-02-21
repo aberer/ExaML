@@ -118,7 +118,7 @@
 #define PACKAGE_VERSION "1.0.1"
 
 /* "is 1, if in productive mode " */
-#define PRODUCTIVE 1
+#define PRODUCTIVE 0
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1

@@ -1592,7 +1592,7 @@ double reduceWgtsYieldScaler(tree *tr, double *accRat, double *dwgt)
 {
   tr->reductionBuffer[0]  = *accRat;
   tr->reductionBuffer[1]  = *dwgt;
-
+  
   HYBRID_ALLREDUCE_VAR(tr, reductionBuffer, 2 , MPI_DOUBLE, double);
   
   *accRat = tr->reductionBuffer[0];

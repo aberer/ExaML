@@ -1573,9 +1573,8 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
     *bestML,
     *bestT, 
     *bt;  
+
   
-  
- 
   /* now here is the RAxML hill climbing search algorithm */
   
   /* initialization for the hash table to compute RF distances */
@@ -1622,11 +1621,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 
   tr->Thorough = 0;     
 
-#ifdef _MEASURE_TIME
-  if(ABS_ID(tr->threadId) == 0)
-    DMT(tr, "finished setup\n "); 
-#endif
-  
+
   /* if we are not using a checkpoint and estimateModel is set to TRUE we call the function 
      that optimizes model parameters, such as the CAT model assignment, the alpha paremeter
      or the rates in the GTR matrix. Otherwise we just optimize the branch lengths. Note that 
@@ -1835,7 +1830,7 @@ void computeBIGRAPID (tree *tr, analdef *adef, boolean estimateModel)
 	    {
 	      tr->rrf =  convergenceCriterion(tr->h, tr->mxtips);
 	      
-	      HYBRID_BCAST_VAR_1(tr, rrf, MPI_DOUBLE); 	      
+	      HYBRID_BCAST_VAR_1(tr, rrf, MPI_DOUBLE); 
 
 	      if(tr->rrf <= 0.01) /* 1% cutoff */
 		{

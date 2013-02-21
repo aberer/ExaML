@@ -694,7 +694,6 @@ void initializeTree(tree *tr, analdef *adef)
   size_t 
     i,
     model;
-  
 
   /* :TODO: replace with myfopen  */
   FILE
@@ -799,4 +798,6 @@ void initializeTree(tree *tr, analdef *adef)
     free(empiricalFrequencies[model]);
 
   free(empiricalFrequencies);
+
+  tr->reductionTestBuffer = malloc(MAX(tr->NumberOfModels, (2*tr->numBranches)) *  sizeof(volatile double*)); 
 }

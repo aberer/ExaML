@@ -836,6 +836,9 @@ typedef  struct  {
 
   /* :TODO: replace this with something better  */
   double *TMP ;
+
+  volatile double* reductionTestBuffer; 
+
 } tree;
 
 
@@ -1320,7 +1323,7 @@ typedef struct _mpiState
   boolean threadsAreLocked; 
   int numberOfThreads;
 
-  volatile int *localGen; 
+  volatile int* volatile localGen; 
   volatile int globalGen; 
 
   pthread_t *threads; 

@@ -1,9 +1,34 @@
-
+#ifndef _THREAD_H
+#define _THREAD_H
+ 
 #include "globalVariables.h"
 
 void startPthreads(int argc, char *argv[]); 
-void tb_workerTrap(tree *tr); 
-void tb_releaseWorkers(tree *tr);
+
+void hybrid_allreduce(tree *tr,  size_t length); 
+void hybrid_allreduce_evaluate(tree *tr, size_t length);
+void hybrid_allreduce_makenewz(tree *tr, size_t length);
+
+void tb_workerTrap_worker(tree *tr); 
+void tb_workerTrap_master(tree *tr) ; 
+
+
+
+inline void tb_releaseWorkers(tree *tr)
+{  
+  ++mpiState.globalGen; 
+  mpiState.threadsAreLocked = FALSE ; 
+}
+
+
+inline void tb_workerTrap(tree *tr)
+{
+  if(tr->threadId == 0 ) 
+    tb_workerTrap_master(tr); 
+  else 
+    tb_workerTrap_worker(tr); 
+}
+
 
 /* :TODO: god this inlining sucks, figure this out later  */
 #ifdef _DEBUG
@@ -29,6 +54,47 @@ inline int ABS_NUM_RANK()
 
 #define MASTER_TREE (mpiState.allTrees[0] )
 #define GET_TREE_NUM(x) (mpiState.allTrees[x])
+
+
+#define HYBRID_ALLREDUCE_VAR_TWO_BARRIERS_TREE(tr, tree_var, length, mpi_type, type) \
+  {									\
+  int rounds = 0;							\
+  int dist = 1;								\
+  while(rounds < numRounds)						\
+    {									\
+									\
+      int potRecv = ( tr->threadId - dist );				\
+      if( potRecv %  (dist << 1 )  == 0 )				\
+	{								\
+	  /* DM(tr, " sending to %d in round %d, distance was %d\n", potRecv,rounds, dist );  */ \
+	  for(int i = 0; i < length; ++i)				\
+	    GET_TREE_NUM(potRecv)->tree_var[i] += tr->tree_var[i];	\
+	}								\
+									\
+      tb_workerTrap(tr);						\
+      if(tr->threadId==0)						\
+	tb_releaseWorkers(tr);						\
+									\
+      dist <<= 1 ;							\
+      ++rounds;								\
+    }									\
+									\
+  if(tr->threadId == 0)							\
+    {									\
+      /* DM(tr,"\n"); */							\
+      tb_workerTrap(tr);						\
+      MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
+      tb_releaseWorkers(tr);						\
+      tb_workerTrap(tr);						\
+      tb_releaseWorkers(tr);						\
+    }									\
+  else									\
+    {									\
+      tb_workerTrap(tr);						\
+      memcpy(tr->tree_var, MASTER_TREE->tree_var, sizeof(type) * length); \
+      tb_workerTrap(tr);						\
+    }									\
+  }									\
 
 
 /* TODO can i trust this barrier?  */
@@ -67,7 +133,7 @@ inline int ABS_NUM_RANK()
 	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
 	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i];		\
 					 				\
-	MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
+	MPI_Allreduce(MPI_IN_PLACE, (void*)tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
 	tb_releaseWorkers(tr);						\
 	tb_workerTrap(tr);						\
 	tb_releaseWorkers(tr);						\
@@ -75,14 +141,17 @@ inline int ABS_NUM_RANK()
     else								\
       {									\
 	tb_workerTrap(tr);						\
-	memcpy(tr->tree_var, MASTER_TREE->tree_var, sizeof(type) * length); \
+	memcpy((void*)tr->tree_var, (void*)MASTER_TREE->tree_var, sizeof(type) * length); \
 	tb_workerTrap(tr);						\
       }									\
   }									\
 
 
 
-#define HYBRID_ALLREDUCE_VAR HYBRID_ALLREDUCE_VAR_TWO_BARRIERS 
+
+#define HYBRID_ALLREDUCE_VAR HYBRID_ALLREDUCE_VAR_TWO_BARRIERS_TREE
+/* #define HYBRID_ALLREDUCE_VAR HYBRID_ALLREDUCE_VAR_ONE_BARRIER */
+/* #define HYBRID_ALLREDUCE_VAR HYBRID_ALLREDUCE_VAR_TWO_BARRIERS */
 
 
 
@@ -161,5 +230,8 @@ inline int ABS_NUM_RANK()
     memcpy(tr->tree_var, buf, length * sizeof(type));			\
     free(buf);								\
   }									\
+
+#endif
+
 
 #endif

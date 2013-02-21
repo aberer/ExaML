@@ -33,6 +33,10 @@
 
 #ifdef INCLUDE_DEFINITION 
 
+/* TMP  */
+int numRounds = 0; 
+/* END TMP  */
+
 examl_MPI_State mpiState; 
 
 checkPointState ckp;
@@ -161,6 +165,8 @@ const partitionLengths pLengths[MAX_MODEL] = {
 #else  /* only include declaration    */
 
 extern examl_MPI_State mpiState; 
+
+extern int numRounds; 
 
 /* TODO assure only writable by abRank=0 */
 extern checkPointState ckp;

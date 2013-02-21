@@ -943,10 +943,15 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
       {
 	int length = 2 * tr->numBranches; 
 	
-	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches); 
-	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches); 
-	
-	HYBRID_ALLREDUCE_VAR(tr, reductionBuffer, length, MPI_DOUBLE, double); 
+	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches);
+	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches);
+
+	hybrid_allreduce_makenewz(tr, length); 
+
+	/* tr->reductionTestBuffer = (volatile double*) realloc((void*)tr->reductionTestBuffer, sizeof(volatile double*) * length);  */
+	/* memcpy((void*)tr->reductionTestBuffer, (void*)tr->reductionBuffer, sizeof(double) * tr->numBranches);  */
+	/* HYBRID_ALLREDUCE_VAR(tr, reductionTestBuffer, length, MPI_DOUBLE, volatile double);  */
+	/* memcpy((void*)tr->reductionBuffer, (void*)tr->reductionTestBuffer, sizeof(double) * tr->numBranches);  */
 
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 
@@ -954,6 +959,7 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	if(mpiState.mpiError != MPI_SUCCESS)
 	    handleMPIError(tr); 
 #endif
+
 
 	memcpy(dlnLdlz, tr->reductionBuffer, sizeof(double) * tr->numBranches); 
 	memcpy(d2lnLdlz2, tr->reductionBuffer + tr->numBranches, sizeof(double) * tr->numBranches); 

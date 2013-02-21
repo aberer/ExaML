@@ -8,7 +8,7 @@ AC_CONFIG_HEADERS([examl/config.h])
 
 AM_INIT_AUTOMAKE(  examl  , 1.0.1 )
 
-dnl AM_SILENT_RULES([yes])
+AM_SILENT_RULES([yes])
 
 
 

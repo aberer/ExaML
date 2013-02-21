@@ -34,6 +34,7 @@
 #include "tree.h" 
 #include "thread.h"
 
+
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #include <xmmintrin.h>
 /*
@@ -1371,6 +1372,23 @@ void isnanCheck(double *v)
 }
 
 
+static void pinToCore(int tid)
+{
+  cpu_set_t cpuset;
+         
+  CPU_ZERO(&cpuset);    
+  CPU_SET(tid, &cpuset);
+
+  if(pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
+    {
+      /* printBothOpen("\n\nThere was a problem finding a physical core for thread number %d to run on.\n", tid); */
+      /* printBothOpen("Probably this happend because you are trying to run more threads than you have cores available,\n"); */
+      /* printBothOpen("which is a thing you should never ever do again, good bye .... \n\n"); */
+      assert(0);
+    }
+}
+
+
 /**
    @brief Is wrapped by the main function. Thus, we can have this
    function as an entry point for the pthreads.
@@ -1379,6 +1397,16 @@ int realMain(int tid, int argc, char *argv[])
 {  
   tree *tr = calloc(1,sizeof(tree));  
   tr->threadId = tid;
+  
+  /* NOTICE: when the master starts the threads, he checks, if the
+     threads have reached the first barrier. This seems to be
+     necessary on some platforms.  */
+  tb_workerTrap(tr);
+  if(tr->threadId == 0)
+    tb_releaseWorkers(tr); 
+
+  int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
+  pinToCore(ABS_ID(tr->threadId) % numCpus); 
 
   analdef *adef = calloc(1,sizeof(analdef)); 
 
@@ -1387,24 +1415,11 @@ int realMain(int tid, int argc, char *argv[])
   /* parse command line arguments: this has a side effect on tr struct and adef struct variables */  
   get_args(argc, argv, adef, tr); 
 
-  /* this is a weird hack: I have to ensure, that all processes are
-     started correctly in startpthreads (by setting the gen counter),
-     here w e correct for that and release the workers */
-  mpiState.localGen[tid] = 1; 
-  if(tid == 0)
-    mpiState.globalGen = 1;
-
-  /* DM(tr, " my abs num is %d\n", ABS_ID(tr->threadId));  */
-
   mpiState.allTrees[tr->threadId] = tr; 
 
   /* generate the ExaML output file names and store them in strings */  
   if(ABS_ID(tr->threadId) == 0)
     makeFileNames(tr);  
-
-  tb_workerTrap(tr);
-  if(tr->threadId == 0)
-    tb_releaseWorkers(tr) ;
 
   initializeTree(tr, adef); 
 
@@ -1544,7 +1559,11 @@ int main(int argc, char *argv[])
 
   examl_initMPI(argc, argv);
 
-  masterTime = gettime();         
+  masterTime = gettime(); 
+  
+  numRounds = ceil(log(mpiState.numberOfThreads) / log(2)) ; 
+
+  /* printf("number of communication rounds = %d\n", numRounds);  */
 
 #ifdef _HYBRID
   startPthreads(argc, argv);
