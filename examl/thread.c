@@ -20,11 +20,63 @@ int ABS_NUM_RANK()
 #endif
 
 
+
+
+void tb_waitForWorkers(tree *tr) 
+{
+  assert(threadsAreLocked == FALSE); 
+  assert(tr->threadId == 0); 
+  /* DM(tr,"master locks workers\n");  */
+  mpiState.barrier[0] = 1;  
+  int sum;
+  do
+    {
+      sum = 0;
+      for(int i = 0; i < mpiState.numberOfThreads; ++i)
+	if(mpiState.barrier[i])
+	  ++sum; 
+    } while(sum != mpiState.numberOfThreads);
+  threadsAreLocked = TRUE;   
+}
+
+
+void tb_workerWait(tree *tr)
+{
+  assert(tr->threadId > 0); 
+  /* DM(tr, " is blocked\n") ; */
+  mpiState.barrier[tr->threadId] = TRUE; 
+  while(mpiState.barrier[tr->threadId]); 
+}
+
+
+void tb_unlockThreads(tree *tr)
+{
+  assert(threadsAreLocked == TRUE); 
+  assert(tr->threadId == 0);
+  memset((void*)mpiState.barrier, 0, sizeof(volatile char) * mpiState.numberOfThreads);
+  /* for(int i = 0; i < mpiState.numberOfThreads; ++i) */
+  /*   mpiState.barrier[i] = FALSE; */
+  threadsAreLocked = FALSE; 
+
+
+  /* DM(tr, "master unlocked threads\n");  */
+}
+
+
+void tb_barrier(tree *tr)
+{
+  if(tr->threadId == 0 ) 
+    tb_waitForWorkers(tr); 
+  else 
+    tb_workerWait(tr); 
+}
+
+
 void hybrid_allreduce_makenewz(tree *tr, size_t length)
 {
   if(tr->threadId == 0)
     {
-      tb_lockThreads(tr); 
+      tb_waitForWorkers(tr); 
 
       for(int t = 1; t < mpiState.numberOfThreads; ++t)
 	{
@@ -36,14 +88,14 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length)
 	
       MPI_Allreduce(MPI_IN_PLACE, tr->reductionBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
       tb_unlockThreads(tr); 
-      tb_lockThreads(tr); 
+      tb_waitForWorkers(tr); 
       tb_unlockThreads(tr); 
     }
   else 
     {
-      tb_workerTrap_worker(tr); 
+      tb_workerWait(tr); 
       memcpy(tr->reductionBuffer, MASTER_TREE->reductionBuffer, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
+      tb_workerWait(tr); 
     }
 }
 
@@ -59,7 +111,7 @@ void hybrid_allreduce_evaluate(tree *tr, size_t length)
       
       while(rounds < numRounds)
 	{
-	  tb_workerTrap(tr); 
+	  tb_barrier(tr); 
 	  if(tr->threadId == 0)
 	    tb_unlockThreads(tr); 
 
@@ -81,69 +133,22 @@ void hybrid_allreduce_evaluate(tree *tr, size_t length)
   /* mpi reduce and local broadcast */
   if(tr->threadId == 0)
     {
-      tb_lockThreads(tr);
+      tb_waitForWorkers(tr);
       MPI_Allreduce(MPI_IN_PLACE, tr->perPartitionLH, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
       tb_unlockThreads(tr); 
-      tb_lockThreads(tr); 
+
+      tb_waitForWorkers(tr); 
       tb_unlockThreads(tr); 
     }
   else 
     {
-      tb_workerTrap_worker(tr); 
+      tb_workerWait(tr); 
       memcpy(tr->perPartitionLH, MASTER_TREE->perPartitionLH, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
+      tb_workerWait(tr); 
     }
 }
 
 
-
-
-void hybrid_allreduce(tree *tr, size_t length)
-{ 
-  if( numRounds != 0 )
-    {
-      tb_workerTrap(tr); 
-      if(tr->threadId == 0) 
-	tb_unlockThreads(tr); 
-  
-      int rounds = 0; 
-      int dist = 1; 
-      while(rounds < numRounds) 
-	{  
-	  int potRecv = ( tr->threadId - dist ); 
-	  if( (potRecv  & (  (dist << 1 ) - 1) )    == 0 ) 
-	    {
-	      volatile double *myPtr = tr->reductionTestBuffer; 
-	      volatile double *otherPtr = GET_TREE_NUM(potRecv)->reductionTestBuffer; 
-	      for(int i = 0; i < length; ++i)
-		otherPtr[i] += myPtr[i];
-	    }
- 
-	  tb_workerTrap(tr); 
-	  if(tr->threadId==0) 
-	    tb_unlockThreads(tr); 
- 
-	  dist <<= 1 ; 
-	  ++rounds; 
-	} 
-    }
-
-  if(tr->threadId == 0) 
-    { 
-      /* DM(tr,"n"); */ 
-      tb_lockThreads(tr); 
-      MPI_Allreduce(MPI_IN_PLACE, (void*)tr->reductionTestBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
-      tb_unlockThreads(tr); 
-      tb_lockThreads(tr); 
-      tb_unlockThreads(tr); 
-    } 
-  else 
-    { 
-      tb_workerTrap_worker(tr); 
-      memcpy((void*)tr->reductionTestBuffer, (void*)MASTER_TREE->reductionTestBuffer, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
-    } 
-}
 
 
 #ifdef _HYBRID
@@ -202,10 +207,7 @@ void startPthreads(int argc, char *argv[])
 
   mpiState.exitCodes = calloc(mpiState.numberOfThreads,sizeof(int));
 
-  mpiState.localGen = (volatile int*) calloc(mpiState.numberOfThreads, sizeof(volatile int));
-  mpiState.globalGen = 0; 
-  mpiState.threadsAreLocked = FALSE; 
-
+  mpiState.barrier = (volatile char*) calloc(mpiState.numberOfThreads, sizeof(volatile char)); 
   mpiState.allTrees = calloc(mpiState.numberOfThreads, sizeof(tree*)); 
   
   for(t = 1; t < mpiState.numberOfThreads; t++)
@@ -221,38 +223,8 @@ void startPthreads(int argc, char *argv[])
 	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	exit(-1);
       } 
-
-    while(mpiState.localGen[t] != 1);
   }
 }
-
-
-void tb_lockThreads(tree *tr) 
-{
-  assert( NOT mpiState.threadsAreLocked)  ; 
-  
-  mpiState.localGen[tr->threadId]++;
-  const int myGen = mpiState.localGen[tr->threadId];  
-  
-  int sum;
-  do
-    {
-      sum = 0;
-      for(int i = 0; i < mpiState.numberOfThreads; ++i)
-	if(myGen == mpiState.localGen[i])
-	  ++sum; 
-    } while(sum != mpiState.numberOfThreads);
-
-  mpiState.threadsAreLocked = TRUE ; 
-}
-
-
-void tb_workerTrap_worker(tree *tr)
-{
-  ++mpiState.localGen[ tr->threadId ];
-  while(mpiState.globalGen != mpiState.localGen[tr->threadId]);
-}
-
 
 
 #else 

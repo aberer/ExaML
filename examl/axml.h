@@ -836,9 +836,6 @@ typedef  struct  {
 
   /* :TODO: replace this with something better  */
   double *TMP ;
-
-  volatile double* reductionTestBuffer; 
-
 } tree;
 
 
@@ -1120,18 +1117,9 @@ extern void storeValuesInTraversalDescriptor(tree *tr, double *value);
 
 
 extern void makenewzIterative(tree *);
-extern void execCore(tree *, volatile double *dlnLdlz, volatile double *d2lnLdlz2);
-
-
 
 extern void determineFullTraversal(nodeptr p, tree *tr);
-/*extern void optRateCat(tree *, int i, double lower_spacing, double upper_spacing, double *lhs);*/
 
-
-
-
-
-/* extern double evaluateGenericInitravPartition(tree *tr, nodeptr p, int model); */
 extern void evaluateGenericVectorIterative(tree *, int startIndex, int endIndex);
 extern void categorizeIterative(tree *, int startIndex, int endIndex);
 
@@ -1319,16 +1307,12 @@ typedef struct _mpiState
   int *exitCodes; 
 
 #ifdef _HYBRID
-  
-  boolean threadsAreLocked; 
-  int numberOfThreads;
 
-  volatile int* volatile localGen; 
-  volatile int globalGen; 
+  int numberOfThreads;
+  volatile char* barrier; 
 
   pthread_t *threads; 
   tree **allTrees; 
-  /* pthread_barrier_t pBarrier;  */
 #endif
   
 } examl_MPI_State; 

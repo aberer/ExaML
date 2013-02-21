@@ -1384,9 +1384,9 @@ static void pinToCore(int tid)
 
   if(pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
     {
-      /* printBothOpen("\n\nThere was a problem finding a physical core for thread number %d to run on.\n", tid); */
-      /* printBothOpen("Probably this happend because you are trying to run more threads than you have cores available,\n"); */
-      /* printBothOpen("which is a thing you should never ever do again, good bye .... \n\n"); */
+      printf("\n\nThere was a problem finding a physical core for thread number %d to run on.\n", tid);
+      printf("Probably this happend because you are trying to run more threads than you have cores available,\n");
+      printf("which is a thing you should never ever do again, good bye .... \n\n");
       assert(0);
     }
 }
@@ -1404,11 +1404,15 @@ int realMain(int tid, int argc, char *argv[])
   /* NOTICE: when the master starts the threads, he checks, if the
      threads have reached the first barrier. This seems to be
      necessary on some platforms.  */
-  tb_workerTrap(tr);
+  tb_barrier(tr);
   if(tr->threadId == 0)
     tb_unlockThreads(tr); 
 
   int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
+  
+  if(ABS_ID(tr->threadId) == 0)
+    printf("\n\ndetected %d cpus\n", numCpus); 
+
   pinToCore(ABS_ID(tr->threadId) % numCpus); 
 
   analdef *adef = calloc(1,sizeof(analdef)); 
@@ -1425,7 +1429,7 @@ int realMain(int tid, int argc, char *argv[])
     makeFileNames(tr);  
 
   initializeTree(tr, adef); 
-
+ 
 #if (PRODUCTIVE == 1  ) 
   if(ABS_ID(tr->threadId) == 0)  
     {
@@ -1439,6 +1443,10 @@ int realMain(int tid, int argc, char *argv[])
      while checkpointing is important and has to be implemented for the library we should not worry about this right now 
   */
 
+
+  tb_barrier(tr);
+  if(tr->threadId == 0)
+    tb_unlockThreads(tr); 
 
   if(adef->useCheckpoint)
     {      
@@ -1573,8 +1581,6 @@ int main(int argc, char *argv[])
 #endif
 
   err = realMain(0, argc, argv); 
-
-  /* tb_workerTrap(tr); */
 
   return err; 
 }

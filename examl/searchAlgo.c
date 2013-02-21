@@ -1369,7 +1369,7 @@ static void masterReadsCheckpoint(tree *tr)
     }
 
   /* :TODO: efficient? */
-  tb_workerTrap(tr);
+  tb_barrier(tr);
   if(tr->threadId == 0)
     tb_unlockThreads(tr);
   

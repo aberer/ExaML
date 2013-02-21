@@ -1741,12 +1741,12 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
       tr->sendBuf = galloc(sendCnt , gd->aType); 
       
       /* inefficient, but that does not matter here */
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
       tb_unlockThreads(tr); 
       
       fillBuffer(tr, tr->sendBuf, ABS_ID(tr->threadId), gd); 
 
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
       tb_unlockThreads(tr); 
 
       switch(gd->aType)
@@ -1822,7 +1822,7 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
       for(int i = 0; i < tr->threadId; ++i)
 	myOffset += getNumSitesAssigned(tr, ABS_ID(i)); 
 
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
 
       GENERIC_DATA myGD; 
       myGD.aType = gd->aType; 
@@ -1838,7 +1838,7 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
 	}      
 
       fillBuffer(tr, &myGD, ABS_ID(tr->threadId), gd);
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
     } 
 }
 
@@ -1902,7 +1902,7 @@ static void gatherRatesManyPartitions(tree *tr)
     
        tr->TMP = (double*)calloc(numPart * tr->maxCategories, sizeof(double)); 
 
-       tb_workerTrap(tr);
+       tb_barrier(tr);
        tb_unlockThreads(tr); 
 
        double *start = MASTER_TREE->TMP; 
@@ -1941,13 +1941,13 @@ static void gatherRatesManyPartitions(tree *tr)
 	   free(offsets); 
 	 } 
        
-       tb_workerTrap(tr);
+       tb_barrier(tr);
        tb_unlockThreads(tr); 
        free(tr->TMP); 
     }
   else 
     {
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
       
       int myOffset = 0; 
       for(int model = 0; model < tr->NumberOfModels; ++model)
@@ -1964,7 +1964,7 @@ static void gatherRatesManyPartitions(tree *tr)
 	    }
 	}
 
-      tb_workerTrap(tr); 
+      tb_barrier(tr); 
     }  
   /* :TODO: the following is sub-optimal */
 }

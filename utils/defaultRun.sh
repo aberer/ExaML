@@ -38,8 +38,9 @@ tree="-t ./testData/$dataset/tree"
 
 
 execArgs=" $aln $model $tree -n tmp  "
-export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
-export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
+
+# export PATH="/lhome/labererae/lib/ompi/bin:$PATH"
+# export LD_LIBRARY_PATH="/lhome/labererae/lib/ompi/lib:$LD_LIBRARY_PATH"
 
 
 status="$(./config.status --config | tr -d "'" )"

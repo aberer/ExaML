@@ -9,25 +9,10 @@ void hybrid_allreduce(tree *tr,  size_t length);
 void hybrid_allreduce_evaluate(tree *tr, size_t length);
 void hybrid_allreduce_makenewz(tree *tr, size_t length);
 
-void tb_workerTrap_worker(tree *tr);
-void tb_lockThreads(tree *tr) ;
-
-
-
-inline void tb_unlockThreads(tree *tr)
-{  
-  ++mpiState.globalGen; 
-  mpiState.threadsAreLocked = FALSE ; 
-}
-
-
-inline void tb_workerTrap(tree *tr)
-{
-  if(tr->threadId == 0 ) 
-    tb_lockThreads(tr); 
-  else 
-    tb_workerTrap_worker(tr); 
-}
+void tb_workerWait(tree *tr);
+void tb_waitForWorkers(tree *tr) ;
+void tb_barrier(tree *tr); 
+void tb_unlockThreads(tree *tr); 
 
 
 /* :TODO: god this inlining sucks, figure this out later  */
@@ -71,7 +56,7 @@ inline int ABS_NUM_RANK()
 	    GET_TREE_NUM(potRecv)->tree_var[i] += tr->tree_var[i];	\
 	}								\
 									\
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
       if(tr->threadId==0)						\
 	tb_unlockThreads(tr);						\
 									\
@@ -82,17 +67,17 @@ inline int ABS_NUM_RANK()
   if(tr->threadId == 0)							\
     {									\
       /* DM(tr,"\n"); */							\
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
       MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
       tb_unlockThreads(tr);						\
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
       tb_unlockThreads(tr);						\
     }									\
   else									\
     {									\
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
       memcpy(tr->tree_var, MASTER_TREE->tree_var, sizeof(type) * length); \
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
     }									\
   }									\
 
@@ -105,7 +90,7 @@ inline int ABS_NUM_RANK()
   {									\
     if(tr->threadId == 0)						\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
   									\
 	for(int i = 0; i < length;++i)					\
 	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
@@ -119,7 +104,7 @@ inline int ABS_NUM_RANK()
 	tb_unlockThreads(tr);						\
       }									\
     else								\
-      tb_workerTrap(tr);						\
+      tb_barrier(tr);						\
   }									\
 
 
@@ -127,7 +112,7 @@ inline int ABS_NUM_RANK()
   {									\
     if(tr->threadId == 0)						\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
   									\
 	for(int i = 0; i < length;++i)					\
 	  for(int j = 1 ; j < mpiState.numberOfThreads ; ++j)		\
@@ -135,14 +120,14 @@ inline int ABS_NUM_RANK()
 					 				\
 	MPI_Allreduce(MPI_IN_PLACE, (void*)tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
 	tb_unlockThreads(tr);						\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
 	tb_unlockThreads(tr);						\
       }									\
     else								\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
 	memcpy((void*)tr->tree_var, (void*)MASTER_TREE->tree_var, sizeof(type) * length); \
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
       }									\
   }									\
 
@@ -162,7 +147,7 @@ inline int ABS_NUM_RANK()
   {									\
     if(tr->threadId == 0)						\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
 	MPI_Bcast(tr->tree_var,length,mpi_type,0,mpiState.comm);	\
 	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
 	  memcpy(GET_TREE_NUM(i)->tree_var, MASTER_TREE->tree_var , length * sizeof(type) ); \
@@ -170,7 +155,7 @@ inline int ABS_NUM_RANK()
       }									\
     else								\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
       }									\
   }									\
 
@@ -179,7 +164,7 @@ inline int ABS_NUM_RANK()
   {									\
    if(tr->threadId ==0)							\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
 	MPI_Bcast(&(tr->tree_var),1,mpi_type,0,mpiState.comm);		\
 	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
 	  GET_TREE_NUM(i)->tree_var = MASTER_TREE->tree_var;		\
@@ -187,14 +172,14 @@ inline int ABS_NUM_RANK()
       }									\
     else								\
       {									\
-	tb_workerTrap(tr);						\
+	tb_barrier(tr);						\
       }									\
   }									\
 
 
 #define HYBRID_BARRIER(tr)					\
   {								\
-    tb_workerTrap(tr);						\
+    tb_barrier(tr);						\
     if(tr->threadId == 0)					\
       {								\
 	MPI_Barrier(mpiState.comm);				\

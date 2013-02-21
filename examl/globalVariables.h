@@ -33,6 +33,10 @@
 
 #ifdef INCLUDE_DEFINITION 
 
+
+int threadsAreLocked = FALSE; 
+
+
 /* TMP  */
 int numRounds = 0; 
 /* END TMP  */
@@ -192,4 +196,5 @@ extern const partitionLengths pLengths[MAX_MODEL];
 extern const unsigned int mask32[32]; 
 extern const char* const protModels[NUM_PROT_MODELS]; 
 extern const unsigned int bitVectorAA[23];
+extern int threadsAreLocked; 
 #endif
