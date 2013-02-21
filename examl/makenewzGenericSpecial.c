@@ -948,18 +948,12 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 
 	hybrid_allreduce_makenewz(tr, length); 
 
-	/* tr->reductionTestBuffer = (volatile double*) realloc((void*)tr->reductionTestBuffer, sizeof(volatile double*) * length);  */
-	/* memcpy((void*)tr->reductionTestBuffer, (void*)tr->reductionBuffer, sizeof(double) * tr->numBranches);  */
-	/* HYBRID_ALLREDUCE_VAR(tr, reductionTestBuffer, length, MPI_DOUBLE, volatile double);  */
-	/* memcpy((void*)tr->reductionBuffer, (void*)tr->reductionTestBuffer, sizeof(double) * tr->numBranches);  */
-
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 
 	mpiState.commPhase = PHASE_BRANCH_OPT; 	
 	if(mpiState.mpiError != MPI_SUCCESS)
 	    handleMPIError(tr); 
 #endif
-
 
 	memcpy(dlnLdlz, tr->reductionBuffer, sizeof(double) * tr->numBranches); 
 	memcpy(d2lnLdlz2, tr->reductionBuffer + tr->numBranches, sizeof(double) * tr->numBranches); 

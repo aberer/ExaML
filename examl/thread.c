@@ -20,6 +20,54 @@ int ABS_NUM_RANK()
 #endif
 
 
+
+/* #define NEWZ_TREE */
+#ifdef NEWZ_TREE 
+void hybrid_allreduce_makenewz(tree *tr, size_t length)
+{
+  /* only the local reduction  */
+  if(numRounds != 0)
+    {
+      int rounds = 0; 
+      int dist = 1;
+      
+      while(rounds < numRounds)
+	{
+	  tb_workerTrap(tr); 
+	  if(tr->threadId == 0)
+	    tb_unlockThreads(tr); 
+
+	  int otherId = tr->threadId + dist; 
+	  if( ( (  tr->threadId & ((dist << 1) - 1 )  ) == 0 ) 
+	      &&  (otherId  < mpiState.numberOfThreads) )
+	    {
+	      double *otherPtr = GET_TREE_NUM(otherId)->reductionBuffer; 
+
+	      for(int i = 0; i < length ;++i)
+		tr->reductionBuffer[i] += otherPtr[i];
+	    }
+
+	  dist <<= 1 ; 
+	  ++rounds; 
+	}
+    }
+
+  if(tr->threadId == 0)
+    {
+      tb_lockThreads(tr); 
+      MPI_Allreduce(MPI_IN_PLACE, tr->reductionBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
+      tb_unlockThreads(tr); 
+      tb_lockThreads(tr); 
+      tb_unlockThreads(tr); 
+    }
+  else 
+    {
+      tb_threadsWait(tr); 
+      memcpy(tr->reductionBuffer, MASTER_TREE->reductionBuffer, sizeof(double) * length);
+      tb_threadsWait(tr); 
+    }
+}
+#else  
 void hybrid_allreduce_makenewz(tree *tr, size_t length)
 {
   if(tr->threadId == 0)
@@ -41,41 +89,43 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length)
     }
   else 
     {
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
       memcpy(tr->reductionBuffer, MASTER_TREE->reductionBuffer, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
     }
 }
+#endif
 
 
-
+#define EVAL_TREE
+#ifdef EVAL_TREE  
 void hybrid_allreduce_evaluate(tree *tr, size_t length)
 {
   /* only the local reduction  */
   if(numRounds != 0)
     {
-      int rounds = 0; 
+      int rounds = 0;
       int dist = 1;
       
       while(rounds < numRounds)
-	{
-	  tb_workerTrap(tr); 
-	  if(tr->threadId == 0)
-	    tb_unlockThreads(tr); 
+  	{
+  	  tb_workerTrap(tr);
+  	  if(tr->threadId == 0)
+  	    tb_unlockThreads(tr);
 
-	  int otherId = tr->threadId + dist; 
-	  if( ( (  tr->threadId & ((dist << 1) - 1 )  ) == 0 ) 
-	      &&  (otherId  < mpiState.numberOfThreads) )
-	    {
-	      double *otherPtr = GET_TREE_NUM(otherId)->perPartitionLH; 
+  	  int otherId = tr->threadId + dist;
+  	  if( ( (  tr->threadId & ((dist << 1) - 1 )  ) == 0 )
+  	      &&  (otherId  < mpiState.numberOfThreads) )
+  	    {
+  	      double *otherPtr = GET_TREE_NUM(otherId)->perPartitionLH;
 
-	      for(int i = 0; i < length ;++i)
-		tr->perPartitionLH[i] += otherPtr[i];
-	    }
+  	      for(int i = 0; i < length ;++i)
+  		tr->perPartitionLH[i] += otherPtr[i];
+  	    }
 
-	  dist <<= 1 ; 
-	  ++rounds; 
-	}
+  	  dist <<= 1 ;
+  	  ++rounds;
+  	}
     }
 
   /* mpi reduce and local broadcast */
@@ -89,11 +139,39 @@ void hybrid_allreduce_evaluate(tree *tr, size_t length)
     }
   else 
     {
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
       memcpy(tr->perPartitionLH, MASTER_TREE->perPartitionLH, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
     }
 }
+#else 
+void hybrid_allreduce_evaluate(tree *tr, size_t length)
+{
+  /* mpi reduce and local broadcast */
+  if(tr->threadId == 0)
+    {
+      tb_lockThreads(tr);
+      
+      for(int i =1 ; i < mpiState.numberOfThreads; ++i)
+	{
+	  double *ptr = GET_TREE_NUM(i)->perPartitionLH; 
+	  for(int j = 0; j < length; ++j)
+	    tr->perPartitionLH[j] += ptr[j]; 
+	}
+      
+      MPI_Allreduce(MPI_IN_PLACE, tr->perPartitionLH, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
+      tb_unlockThreads(tr); 
+      tb_lockThreads(tr); 
+      tb_unlockThreads(tr); 
+    }
+  else 
+    {
+      tb_threadsWait(tr); 
+      memcpy(tr->perPartitionLH, MASTER_TREE->perPartitionLH, sizeof(double) * length);
+      tb_threadsWait(tr); 
+    }
+}
+#endif
 
 
 
@@ -139,9 +217,9 @@ void hybrid_allreduce(tree *tr, size_t length)
     } 
   else 
     { 
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
       memcpy((void*)tr->reductionTestBuffer, (void*)MASTER_TREE->reductionTestBuffer, sizeof(double) * length);
-      tb_workerTrap_worker(tr); 
+      tb_threadsWait(tr); 
     } 
 }
 
@@ -227,6 +305,8 @@ void startPthreads(int argc, char *argv[])
 }
 
 
+
+
 void tb_lockThreads(tree *tr) 
 {
   assert( NOT mpiState.threadsAreLocked)  ; 
@@ -247,7 +327,7 @@ void tb_lockThreads(tree *tr)
 }
 
 
-void tb_workerTrap_worker(tree *tr)
+void tb_threadsWait(tree *tr)
 {
   ++mpiState.localGen[ tr->threadId ];
   while(mpiState.globalGen != mpiState.localGen[tr->threadId]);
