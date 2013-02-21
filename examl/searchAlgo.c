@@ -1160,7 +1160,7 @@ static void writeCheckpoint(tree *tr)
   fclose(f); 
 
 #ifdef _MEASURE_TIME
-  DMT(tr,"Checkpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood); 
+  DMT(tr,"Checkpoint written to: %s likelihood: %f\tnewz/eval:%f/%f\n", extendedName, tr->likelihood, newzTime, evalTime); 
 #else 
   printBothOpen(tr,"\nCheckpoint written to: %s likelihood: %f\n", extendedName, tr->likelihood);
 #endif

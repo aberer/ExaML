@@ -11,23 +11,9 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length);
 
 void tb_threadsWait(tree *tr);
 void tb_lockThreads(tree *tr) ;
+void tb_unlockThreads(tree *tr); 
+void tb_workerTrap(tree *tr);
 
-
-
-inline void tb_unlockThreads(tree *tr)
-{  
-  ++mpiState.globalGen; 
-  mpiState.threadsAreLocked = FALSE ; 
-}
-
-
-inline void tb_workerTrap(tree *tr)
-{
-  if(tr->threadId == 0 ) 
-    tb_lockThreads(tr); 
-  else 
-    tb_threadsWait(tr); 
-}
 
 
 /* :TODO: god this inlining sucks, figure this out later  */

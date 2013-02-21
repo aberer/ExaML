@@ -1439,7 +1439,6 @@ int realMain(int tid, int argc, char *argv[])
      while checkpointing is important and has to be implemented for the library we should not worry about this right now 
   */
 
-
   if(adef->useCheckpoint)
     {      
       /* read checkpoint file */

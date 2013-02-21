@@ -41,6 +41,8 @@
 #endif
 
 
+#include "cycle.h"
+
 
 #include "thread.h"
 
@@ -735,8 +737,33 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   
   evaluateIterative(tr);  
 
-  hybrid_allreduce_evaluate(tr, tr->NumberOfModels); 
+  
+  /* ticks start = 0;  */
+  /* if(ABS_ID(tr->threadId) == 0) */
+  /*   start = getticks();      */
 
+  double time = 0; 
+  if(ABS_ID(tr->threadId) == 0)
+    {
+      time = gettime(); 
+    }
+
+
+  hybrid_allreduce_evaluate(tr, tr->NumberOfModels); 
+  
+  if(ABS_ID(tr->threadId) == 0)
+    {
+      evalTime += gettime() - time ; 
+    }
+
+
+  /* if(ABS_ID(tr->threadId) == 0) */
+  /*   { */
+  /*     ticks stop = getticks();  */
+  /*     /\* DM(tr, "eval: %g ticks\n", elapsed(start,stop));  *\/ */
+  /*     evalTime += elapsed(start,stop);  */
+  /*   } */
+  
 
   /* tr->reductionTestBuffer = (volatile double*)realloc((void*)tr->reductionTestBuffer, tr->NumberOfModels * sizeof(volatile double*)); */
   /* memcpy((void*)tr->reductionTestBuffer, (void*)tr->perPartitionLH, tr->NumberOfModels * sizeof(double));  */

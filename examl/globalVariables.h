@@ -35,6 +35,8 @@
 
 /* TMP  */
 int numRounds = 0; 
+double newzTime = 0; 
+double evalTime = 0; 
 /* END TMP  */
 
 examl_MPI_State mpiState; 
@@ -165,6 +167,10 @@ const partitionLengths pLengths[MAX_MODEL] = {
 #else  /* only include declaration    */
 
 extern examl_MPI_State mpiState; 
+
+extern double newzTime; 
+extern double evalTime; 
+
 
 extern int numRounds; 
 

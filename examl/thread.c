@@ -83,13 +83,14 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length)
 	}
 	
       MPI_Allreduce(MPI_IN_PLACE, tr->reductionBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
-      tb_unlockThreads(tr); 
-      tb_lockThreads(tr); 
+
+      tb_unlockThreads(tr);
+      tb_lockThreads(tr);
       tb_unlockThreads(tr); 
     }
   else 
     {
-      tb_threadsWait(tr); 
+      tb_threadsWait(tr);
       memcpy(tr->reductionBuffer, MASTER_TREE->reductionBuffer, sizeof(double) * length);
       tb_threadsWait(tr); 
     }
@@ -305,6 +306,22 @@ void startPthreads(int argc, char *argv[])
 }
 
 
+
+
+void tb_unlockThreads(tree *tr)
+{  
+  ++mpiState.globalGen; 
+  mpiState.threadsAreLocked = FALSE ; 
+}
+
+
+void tb_workerTrap(tree *tr)
+{
+  if(tr->threadId == 0 ) 
+    tb_lockThreads(tr); 
+  else 
+    tb_threadsWait(tr); 
+}
 
 
 void tb_lockThreads(tree *tr) 

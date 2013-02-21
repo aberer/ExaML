@@ -33,6 +33,9 @@
 #include "axml.h"
 #include "faultTolerance.h"
 
+#include "cycle.h"
+
+
 
 #ifdef __SIM_SSE3
 #include <xmmintrin.h>
@@ -946,7 +949,23 @@ static void topLevelMakenewz(tree *tr, double *z0, int _maxiter, double *result)
 	memcpy(tr->reductionBuffer, dlnLdlz, sizeof(double) * tr->numBranches);
 	memcpy(tr->reductionBuffer + tr->numBranches, d2lnLdlz2, sizeof(double) * tr->numBranches);
 
-	hybrid_allreduce_makenewz(tr, length); 
+	/* ticks start = 0;  */
+	/* if(ABS_ID(tr->threadId) == 0) */
+	/*   start  = getticks();      */
+	
+	double time = 0; 
+	if(ABS_ID(tr->threadId) == 0)
+	  time = gettime(); 
+	hybrid_allreduce_makenewz(tr, length); 	
+	if(ABS_ID(tr->threadId) == 0)
+	  newzTime += gettime() - time; 
+	
+	/* if(ABS_ID(tr->threadId) == 0) */
+	/*   { */
+	/*     ticks stop = getticks();  */
+	/*     /\* DM(tr, "newz: %g ticks\n", elapsed(stop,start));  *\/ */
+	/*     newzTime += elapsed(start,stop);  */
+	/*   } */
 
 #ifdef _USE_RTS
 	mpiState.generation[PHASE_BRANCH_OPT]++; 
