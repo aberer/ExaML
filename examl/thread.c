@@ -24,7 +24,7 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length)
 {
   if(tr->threadId == 0)
     {
-      tb_workerTrap_master(tr); 
+      tb_lockThreads(tr); 
 
       for(int t = 1; t < mpiState.numberOfThreads; ++t)
 	{
@@ -35,9 +35,9 @@ void hybrid_allreduce_makenewz(tree *tr, size_t length)
 	}
 	
       MPI_Allreduce(MPI_IN_PLACE, tr->reductionBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
-      tb_releaseWorkers(tr); 
-      tb_workerTrap_master(tr); 
-      tb_releaseWorkers(tr); 
+      tb_unlockThreads(tr); 
+      tb_lockThreads(tr); 
+      tb_unlockThreads(tr); 
     }
   else 
     {
@@ -61,7 +61,7 @@ void hybrid_allreduce_evaluate(tree *tr, size_t length)
 	{
 	  tb_workerTrap(tr); 
 	  if(tr->threadId == 0)
-	    tb_releaseWorkers(tr); 
+	    tb_unlockThreads(tr); 
 
 	  int otherId = tr->threadId + dist; 
 	  if( ( (  tr->threadId & ((dist << 1) - 1 )  ) == 0 ) 
@@ -81,11 +81,11 @@ void hybrid_allreduce_evaluate(tree *tr, size_t length)
   /* mpi reduce and local broadcast */
   if(tr->threadId == 0)
     {
-      tb_workerTrap_master(tr);
+      tb_lockThreads(tr);
       MPI_Allreduce(MPI_IN_PLACE, tr->perPartitionLH, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
-      tb_releaseWorkers(tr); 
-      tb_workerTrap_master(tr); 
-      tb_releaseWorkers(tr); 
+      tb_unlockThreads(tr); 
+      tb_lockThreads(tr); 
+      tb_unlockThreads(tr); 
     }
   else 
     {
@@ -104,7 +104,7 @@ void hybrid_allreduce(tree *tr, size_t length)
     {
       tb_workerTrap(tr); 
       if(tr->threadId == 0) 
-	tb_releaseWorkers(tr); 
+	tb_unlockThreads(tr); 
   
       int rounds = 0; 
       int dist = 1; 
@@ -121,7 +121,7 @@ void hybrid_allreduce(tree *tr, size_t length)
  
 	  tb_workerTrap(tr); 
 	  if(tr->threadId==0) 
-	    tb_releaseWorkers(tr); 
+	    tb_unlockThreads(tr); 
  
 	  dist <<= 1 ; 
 	  ++rounds; 
@@ -131,11 +131,11 @@ void hybrid_allreduce(tree *tr, size_t length)
   if(tr->threadId == 0) 
     { 
       /* DM(tr,"n"); */ 
-      tb_workerTrap_master(tr); 
+      tb_lockThreads(tr); 
       MPI_Allreduce(MPI_IN_PLACE, (void*)tr->reductionTestBuffer, length, MPI_DOUBLE, MPI_SUM, mpiState.comm); 
-      tb_releaseWorkers(tr); 
-      tb_workerTrap_master(tr); 
-      tb_releaseWorkers(tr); 
+      tb_unlockThreads(tr); 
+      tb_lockThreads(tr); 
+      tb_unlockThreads(tr); 
     } 
   else 
     { 
@@ -246,11 +246,13 @@ void tb_lockThreads(tree *tr)
   mpiState.threadsAreLocked = TRUE ; 
 }
 
+
 void tb_workerTrap_worker(tree *tr)
 {
   ++mpiState.localGen[ tr->threadId ];
   while(mpiState.globalGen != mpiState.localGen[tr->threadId]);
 }
+
 
 
 #else 

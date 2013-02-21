@@ -9,12 +9,12 @@ void hybrid_allreduce(tree *tr,  size_t length);
 void hybrid_allreduce_evaluate(tree *tr, size_t length);
 void hybrid_allreduce_makenewz(tree *tr, size_t length);
 
-void tb_workerTrap_worker(tree *tr); 
-void tb_workerTrap_master(tree *tr) ; 
+void tb_workerTrap_worker(tree *tr);
+void tb_lockThreads(tree *tr) ;
 
 
 
-inline void tb_releaseWorkers(tree *tr)
+inline void tb_unlockThreads(tree *tr)
 {  
   ++mpiState.globalGen; 
   mpiState.threadsAreLocked = FALSE ; 
@@ -24,7 +24,7 @@ inline void tb_releaseWorkers(tree *tr)
 inline void tb_workerTrap(tree *tr)
 {
   if(tr->threadId == 0 ) 
-    tb_workerTrap_master(tr); 
+    tb_lockThreads(tr); 
   else 
     tb_workerTrap_worker(tr); 
 }
@@ -73,7 +73,7 @@ inline int ABS_NUM_RANK()
 									\
       tb_workerTrap(tr);						\
       if(tr->threadId==0)						\
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
 									\
       dist <<= 1 ;							\
       ++rounds;								\
@@ -84,9 +84,9 @@ inline int ABS_NUM_RANK()
       /* DM(tr,"\n"); */							\
       tb_workerTrap(tr);						\
       MPI_Allreduce(MPI_IN_PLACE, tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
-      tb_releaseWorkers(tr);						\
+      tb_unlockThreads(tr);						\
       tb_workerTrap(tr);						\
-      tb_releaseWorkers(tr);						\
+      tb_unlockThreads(tr);						\
     }									\
   else									\
     {									\
@@ -116,7 +116,7 @@ inline int ABS_NUM_RANK()
 	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
 	  memcpy(GET_TREE_NUM(i)->tree_var, MASTER_TREE->tree_var,sizeof(type) * length); \
 									\
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
       }									\
     else								\
       tb_workerTrap(tr);						\
@@ -134,9 +134,9 @@ inline int ABS_NUM_RANK()
 	    tr->tree_var[i] +=  GET_TREE_NUM(j)->tree_var[i];		\
 					 				\
 	MPI_Allreduce(MPI_IN_PLACE, (void*)tr->tree_var , length, mpi_type, MPI_SUM, mpiState.comm); \
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
 	tb_workerTrap(tr);						\
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
       }									\
     else								\
       {									\
@@ -166,7 +166,7 @@ inline int ABS_NUM_RANK()
 	MPI_Bcast(tr->tree_var,length,mpi_type,0,mpiState.comm);	\
 	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
 	  memcpy(GET_TREE_NUM(i)->tree_var, MASTER_TREE->tree_var , length * sizeof(type) ); \
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
       }									\
     else								\
       {									\
@@ -183,7 +183,7 @@ inline int ABS_NUM_RANK()
 	MPI_Bcast(&(tr->tree_var),1,mpi_type,0,mpiState.comm);		\
 	for(int i = 1; i < mpiState.numberOfThreads; ++i)		\
 	  GET_TREE_NUM(i)->tree_var = MASTER_TREE->tree_var;		\
-	tb_releaseWorkers(tr);						\
+	tb_unlockThreads(tr);						\
       }									\
     else								\
       {									\
@@ -198,7 +198,7 @@ inline int ABS_NUM_RANK()
     if(tr->threadId == 0)					\
       {								\
 	MPI_Barrier(mpiState.comm);				\
-	tb_releaseWorkers(tr);					\
+	tb_unlockThreads(tr);					\
       }								\
   }								\
     

@@ -1742,12 +1742,12 @@ static void gatherVariableForAssignedSites(tree *tr, GENERIC_DATA *gd)
       
       /* inefficient, but that does not matter here */
       tb_workerTrap(tr); 
-      tb_releaseWorkers(tr); 
+      tb_unlockThreads(tr); 
       
       fillBuffer(tr, tr->sendBuf, ABS_ID(tr->threadId), gd); 
 
       tb_workerTrap(tr); 
-      tb_releaseWorkers(tr); 
+      tb_unlockThreads(tr); 
 
       switch(gd->aType)
 	{
@@ -1903,7 +1903,7 @@ static void gatherRatesManyPartitions(tree *tr)
        tr->TMP = (double*)calloc(numPart * tr->maxCategories, sizeof(double)); 
 
        tb_workerTrap(tr);
-       tb_releaseWorkers(tr); 
+       tb_unlockThreads(tr); 
 
        double *start = MASTER_TREE->TMP; 
        for(int model = 0, ctr = 0; model < tr->NumberOfModels; ++model)
@@ -1942,7 +1942,7 @@ static void gatherRatesManyPartitions(tree *tr)
 	 } 
        
        tb_workerTrap(tr);
-       tb_releaseWorkers(tr); 
+       tb_unlockThreads(tr); 
        free(tr->TMP); 
     }
   else 

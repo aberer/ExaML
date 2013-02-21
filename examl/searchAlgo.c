@@ -1371,7 +1371,7 @@ static void masterReadsCheckpoint(tree *tr)
   /* :TODO: efficient? */
   tb_workerTrap(tr);
   if(tr->threadId == 0)
-    tb_releaseWorkers(tr);
+    tb_unlockThreads(tr);
   
   readCheckpoint(tr, &ckp, f);   
 }

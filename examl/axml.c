@@ -111,6 +111,7 @@ void *malloc_aligned(size_t size)
 
 
 
+#if PRODUCTIVE == 1 
 static void printBoth(tree *tr, FILE *f, const char* format, ... )
 {
   if(ABS_ID(tr->threadId) == 0)
@@ -125,6 +126,7 @@ static void printBoth(tree *tr, FILE *f, const char* format, ... )
       va_end(args);
     }
 }
+#endif
 
 void printBothOpen(tree *tr, const char* format, ... )
 {
@@ -1031,6 +1033,7 @@ static void makeFileNames(tree *tr)
 
 
 
+#if PRODUCTIVE ==  1
 static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *argv[])
 {
   if(ABS_ID(tr->threadId) == 0)
@@ -1159,7 +1162,7 @@ static void printModelAndProgramInfo(tree *tr, analdef *adef, int argc, char *ar
       fclose(infoFile);
     }
 }
-/* #endif */
+#endif
 
 void printResult(tree *tr, analdef *adef, boolean finalPrint)
 {
@@ -1403,7 +1406,7 @@ int realMain(int tid, int argc, char *argv[])
      necessary on some platforms.  */
   tb_workerTrap(tr);
   if(tr->threadId == 0)
-    tb_releaseWorkers(tr); 
+    tb_unlockThreads(tr); 
 
   int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
   pinToCore(ABS_ID(tr->threadId) % numCpus); 
