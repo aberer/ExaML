@@ -674,7 +674,7 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   /* now this may be the entry point of the library to compute 
      the log like at a branch defined by p and p->back == q */
 
-  double 
+  volatile double 
     result = 0.0;
   
   nodeptr 
@@ -736,6 +736,12 @@ void evaluateGeneric (tree *tr, nodeptr p, boolean fullTraversal)
   evaluateIterative(tr);  
 
   hybrid_allreduce_evaluate(tr, tr->NumberOfModels); 
+
+
+  /* tr->reductionTestBuffer = (volatile double*)realloc((void*)tr->reductionTestBuffer, tr->NumberOfModels * sizeof(volatile double*)); */
+  /* memcpy((void*)tr->reductionTestBuffer, (void*)tr->perPartitionLH, tr->NumberOfModels * sizeof(double));  */
+  /* HYBRID_ALLREDUCE_VAR(tr, reductionTestBuffer, tr->NumberOfModels, MPI_DOUBLE, volatile double); */
+  /* memcpy((void*)tr->perPartitionLH, (void*)tr->reductionTestBuffer, tr->NumberOfModels * sizeof(double));  */
 
 
 #ifdef _USE_RTS
